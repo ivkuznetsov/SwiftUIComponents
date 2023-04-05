@@ -78,14 +78,16 @@ public final class ListTracker<List: ListContainer>: NSObject {
             if (!hasRefresh && paging.content.items.isEmpty) || paging.content.next != nil {
                 result.add(loadMoreView(paging.state, { [weak self] in
                     self?.paging?.retry()
-                }).onAppear(perform: { [weak self] in
-                    self?.footerVisible = true
+                }).onBecomingVisible(perform: { [weak self] visible in
+                    self?.footerVisible = visible
+                    
+                    if !visible {
+                        self?.paging?.resetFail()
+                    }
+                    
                     if self?.isFooterVisible == true {
                         self?.paging?.loadMoreIfAllowed()
                     }
-                }).onDisappear(perform: { [weak self] in
-                    self?.paging?.resetFail()
-                    self?.footerVisible = false
                 }).inContainer(), sectionId: pagingLoadingSectionId)
             }
         }
