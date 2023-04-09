@@ -25,7 +25,7 @@ public struct FoolterLoadingView: View {
                     retry()
                 }
             case .loading:
-                ProgressView()
+                InCellProgressView()
             }
         }.frame(height: 44)
     }

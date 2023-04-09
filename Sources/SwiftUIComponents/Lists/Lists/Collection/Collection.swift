@@ -93,13 +93,13 @@ public final class Collection: NSObject, ListContainer, PlatformCollectionDelega
                 }
             }
             
-            let cell = content.view.createCell(reuseId: info!.features.reuseId(item), at: indexPath)
+            let cell = content.view.createCell(reuseId: info!.reuseId(item), at: indexPath)
             info!.fill(item, cell)
             return cell
         }
         
         let layout = CollectionViewLayout { [unowned self] index, environment in
-            if let layout = content.snapshot.sections[safe: index]?.features.additions?.layout {
+            if let layout = content.snapshot.sections[safe: index]?.additions?.layout {
                 return layout(environment)
             }
             return .grid(environment)

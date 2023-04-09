@@ -13,17 +13,13 @@ public typealias DataSourceSnapshot = NSDiffableDataSourceSnapshot<String, AnyHa
 
 public struct Snapshot<View: ListView> {
     
-    struct Section {
-        
-        struct Features {
-            let reuseId: (AnyHashable)->String
-            let prefetch: ((AnyHashable)->PrefetchCancel?)?
-            let additions: View.CellAdditions?
-        }
+    final class Section {
         
         let fill: (AnyHashable, View.Cell)->()
         let typeCheck: (AnyHashable)->Bool
-        let features: Features
+        let reuseId: (AnyHashable)->String
+        let prefetch: ((AnyHashable)->PrefetchCancel?)?
+        let additions: View.CellAdditions?
         
         init<Item: Hashable>(_ item: Item.Type,
                              fill: @escaping (Item, View.Cell)->(),
@@ -33,9 +29,9 @@ public struct Snapshot<View: ListView> {
             
             self.fill = { fill($0 as! Item, $1) }
             self.typeCheck = { $0 is Item }
-            self.features = .init(reuseId: { reuseId($0 as! Item) },
-                                  prefetch: prefetch == nil ? nil : { prefetch!($0 as! Item) },
-                                  additions: additions)
+            self.reuseId = { reuseId($0 as! Item) }
+            self.prefetch = prefetch == nil ? nil : { prefetch!($0 as! Item) }
+            self.additions = additions
         }
     }
     
@@ -51,7 +47,7 @@ public struct Snapshot<View: ListView> {
     
     public init() {}
     
-    var hasPrefetch: Bool { sections.contains(where: { $0.features.prefetch != nil }) }
+    var hasPrefetch: Bool { sections.contains(where: { $0.prefetch != nil }) }
     
     private var viewContainerInfo: Section {
         Section(ViewContainer.self, fill: {

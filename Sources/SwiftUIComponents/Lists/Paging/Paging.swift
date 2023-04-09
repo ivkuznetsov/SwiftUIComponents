@@ -66,7 +66,7 @@ public class Paging<Item: Hashable>: PagingProtocol {
         }
     }
     
-    private var paramenters: (loadPage: (_ offset: Item?) async throws -> PagingContent, loader: LoadingHelper)!
+    private var paramenters: (loadPage: (_ offset: AnyHashable?) async throws -> PagingContent, loader: LoadingHelper)!
     
     public enum Direction {
         case bottom
@@ -84,13 +84,13 @@ public class Paging<Item: Hashable>: PagingProtocol {
         self.initialLoading = initialLoading
     }
     
-    public func set(loadPage: @escaping (_ offset: Item?) async throws -> PagingContent, with loader: LoadingHelper) {
+    public func set(loadPage: @escaping (_ offset: AnyHashable?) async throws -> PagingContent, with loader: LoadingHelper) {
         paramenters = (loadPage, loader)
     }
     
-    private func append(_ content: PagingContent) {
+    nonisolated private func append(_ content: PagingContent) async {
         let itemsToAdd = direction == .top ? content.items.reversed() : content.items
-        var array = direction == .top ? self.content.items.reversed() : self.content.items
+        var array = await direction == .top ? self.content.items.reversed() : self.content.items
         var set = Set(array)
         var allItemsAreTheSame = true // backend returned the same items for the next page, prevent for infinit loading
         
@@ -101,7 +101,11 @@ public class Paging<Item: Hashable>: PagingProtocol {
                 allItemsAreTheSame = false
             }
         }
-        self.content = PagingContent(direction == .top ? array.reversed() : array, next: allItemsAreTheSame ? nil : content.next)
+        await update(content: PagingContent(direction == .top ? array.reversed() : array, next: allItemsAreTheSame ? nil : content.next))
+    }
+    
+    private func update(content: PagingContent) {
+        self.content = content
     }
     
     public func initalRefresh() {
@@ -143,8 +147,8 @@ public class Paging<Item: Hashable>: PagingProtocol {
         
         paramenters.loader.run(.none, id: feedId) { [weak self] _ in
             do {
-                if let result = try await self?.paramenters.loadPage(next as? Item) {
-                    self?.append(result)
+                if let result = try await self?.paramenters.loadPage(next) {
+                    await self?.append(result)
                     self?.state.value = .stop
                 }
             } catch {

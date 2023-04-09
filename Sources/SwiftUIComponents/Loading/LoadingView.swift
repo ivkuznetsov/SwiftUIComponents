@@ -8,12 +8,6 @@ import CommonUtils
 #if os(iOS)
 
 @available (iOS 15, *)
-fileprivate extension ProgressView {
-    
-    var styled: some View { progressViewStyle(.circular).controlSize(.large).tint(.gray) }
-}
-
-@available (iOS 15, *)
 public struct LoadingView: LoadingViewProtocol {
     
     private struct CircularProgressView: View {
@@ -49,7 +43,7 @@ public struct LoadingView: LoadingViewProtocol {
         if task.progress > 0 {
             CircularProgressView(progress: task.progress)
         } else {
-            ProgressView().styled
+            InCellProgressView(style: .big)
         }
     }
 }

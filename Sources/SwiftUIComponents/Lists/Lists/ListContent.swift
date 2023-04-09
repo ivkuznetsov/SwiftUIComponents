@@ -42,7 +42,7 @@ public final class ListContent<View: ListView> {
     func prefetch(_ indexPaths: [IndexPath]) {
         indexPaths.forEach {
             if let info = snapshot.info($0),
-               let cancel = info.section.features.prefetch?(info.item) {
+               let cancel = info.section.prefetch?(info.item) {
                 prefetchTokens[$0] = cancel
             }
         }

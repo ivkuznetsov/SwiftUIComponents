@@ -134,7 +134,7 @@ public final class Table: NSObject, ListContainer, PlatformTableDelegate, Prefet
             guard let info = content.snapshot.info(indexPath)?.section else {
                 fatalError("Please specify cell for \(item)")
             }
-            let cell = content.view.createCell(reuseId: info.features.reuseId(item))
+            let cell = content.view.createCell(reuseId: info.reuseId(item))
             info.fill(item, cell)
             return cell
         }
@@ -174,7 +174,7 @@ public final class Table: NSObject, ListContainer, PlatformTableDelegate, Prefet
     public func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         
         if let info = content.snapshot.info(indexPath),
-            let editor = info.section.features.additions?.editor(info.item) {
+            let editor = info.section.additions?.editor(info.item) {
             switch editor {
             case .delete(let action): action()
             case .insert(let action): action()
@@ -185,7 +185,7 @@ public final class Table: NSObject, ListContainer, PlatformTableDelegate, Prefet
     
     public func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         if let info = content.snapshot.info(indexPath),
-           let editor = info.section.features.additions?.editor(info.item),
+           let editor = info.section.additions?.editor(info.item),
            case .actions(let actions) = editor {
             let configuration = UISwipeActionsConfiguration(actions: actions())
             configuration.performsFirstActionWithFullSwipe = false
@@ -196,7 +196,7 @@ public final class Table: NSObject, ListContainer, PlatformTableDelegate, Prefet
     
     public func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCell.EditingStyle {
         if let info = content.snapshot.info(indexPath),
-           let editor = info.section.features.additions?.editor(info.item) {
+           let editor = info.section.additions?.editor(info.item) {
             return editor.style
         }
         return .none
