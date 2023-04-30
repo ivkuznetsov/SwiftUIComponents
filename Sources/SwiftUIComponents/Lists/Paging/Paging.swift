@@ -143,7 +143,7 @@ public extension Paging.Loader where ContentState == Paging.CommonState {
 extension Paging {
     public typealias CommonLoader = Loader<CommonState>
     
-    public final class CommonState: PagingContentState, ObservableObject {
+    public final class CommonState: ObservablePagingContentState {
         
         private let direction: Direction
         private let cache: Cache?
@@ -192,6 +192,36 @@ extension Paging {
             }
             self.content = .init(items: direction == .top ? array.reversed() : array,
                                  next: allItemsAreTheSame ? nil : content.next)
+        }
+    }
+    
+    public typealias CustomLoader = Loader<CustomState>
+    
+    public final class CustomState: ObservablePagingContentState {
+        
+        public var content: Page<Item> { self.get() }
+        private let get: () -> Page<Item>
+        private let refresh: () async throws ->()
+        private let loadMore: () async throws ->()
+        
+        public init<State: ObservableObject>(state: State,
+                                      get: @escaping (State)->Page<Item>,
+                                      refresh: @escaping (State) async throws ->(),
+                                      loadMore: @escaping (State) async throws ->()) {
+            self.refresh = { try await refresh(state) }
+            self.loadMore = { try await loadMore(state) }
+            self.get = { get(state) }
+            state.sink(retained: self) { [unowned self] in
+                objectWillChange.send()
+            }
+        }
+        
+        public func refresh() async throws {
+            try await refresh()
+        }
+        
+        public func loadMore() async throws {
+            try await loadMore()
         }
     }
 }
