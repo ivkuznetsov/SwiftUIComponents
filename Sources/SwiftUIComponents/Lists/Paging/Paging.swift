@@ -12,169 +12,186 @@ import CommonUtils
 import SwiftUI
 
 @MainActor
-public protocol PagingProtocol: ObservableObject {
-    associatedtype Item: Hashable
+public protocol PagingLoader {
+    associatedtype ContentState: PagingContentState
     
-    var content: PagingContent { get set }
+    var contentState: ContentState { get set }
     
-    var state: LoadingState { get }
+    var loadingState: LoadingState { get }
     
     func refresh()
     
     func refresh(userInitiated: Bool)
     
     func loadMore()
-    
-    func resetFail()
-    
-    func loadMoreIfAllowed()
-    
-    func retry()
 }
 
-public struct PagingContent {
-    public let items: [AnyHashable]
-    public let next: AnyHashable?
+public typealias ObservablePagingLoader = PagingLoader & ObservableObject
+
+public protocol PagingContentState {
+    associatedtype Item: Hashable
     
-    public init(_ items: [AnyHashable], next: AnyHashable? = nil) {
-        self.items = items
-        self.next = next
-    }
+    var content: Page<Item> { get }
     
-    public static var empty: Self { .init([]) }
+    func refresh() async throws
     
-    func isEqual(_ content: Self) async -> Bool {
-        if items.count != content.items.count || next != content.next {
-            return false
-        }
-        return items == content.items
+    func loadMore() async throws
+}
+
+public extension PagingContentState {
+    
+    var anyContent: Page<AnyHashable> {
+        .init(items: content.items, next: content.next)
     }
 }
 
-@MainActor
-public class Paging<Item: Hashable>: PagingProtocol {
+public typealias ObservablePagingContentState = PagingContentState & ObservableObject
+
+public enum Paging<Item: Hashable> {
     
-    public var performOnRefresh: (()->())? = nil
+    public struct Cache {
+        let save: ([Item])->()
+        let load: ()->[Item]
+        
+        public init(save: @escaping ([Item]) -> Void, load: @escaping () -> [Item]) {
+            self.save = save
+            self.load = load
+        }
+    }
+}
+
+extension Paging {
     
-    public var shouldLoadMore: ()->Bool = { true }
+    @MainActor
+    public final class Loader<ContentState: ObservablePagingContentState>: ObservablePagingLoader {
     
-    public var firstPageCache: (save: ([Item])->(), load: ()->[Item])? = nil {
-        didSet {
-            if let items = firstPageCache?.load() {
-                content = PagingContent(items, next: nil)
+        private let initialLoading: LoadingHelper.Presentation
+        private let feedId = UUID().uuidString
+        private let loader: LoadingHelper
+        public let loadingState = LoadingState()
+        
+        public var performOnRefresh: (()->())? = nil
+        
+        @RePublish public var contentState: ContentState
+        
+        public init(initialLoading: LoadingHelper.Presentation = .opaque,
+                    loader: LoadingHelper,
+                    contentState: ContentState) {
+            self.initialLoading = initialLoading
+            self.loader = loader
+            self.contentState = contentState
+        }
+        
+        public func initalRefresh() {
+            if loadingState.value != .loading && contentState.content.items.isEmpty {
+                refresh()
             }
         }
-    }
-    
-    private var paramenters: (loadPage: (_ offset: AnyHashable?) async throws -> PagingContent, loader: LoadingHelper)!
-    
-    public enum Direction {
-        case bottom
-        case top
-    }
-    
-    private let direction: Direction
-    private let initialLoading: LoadingHelper.Presentation
-    private let feedId = UUID().uuidString
-    public let state = LoadingState()
-    @Published public var content = PagingContent.empty
-    
-    public init(direction: Direction = .bottom, initialLoading: LoadingHelper.Presentation = .opaque) {
-        self.direction = direction
-        self.initialLoading = initialLoading
-    }
-    
-    public func set(loadPage: @escaping (_ offset: AnyHashable?) async throws -> PagingContent, with loader: LoadingHelper) {
-        paramenters = (loadPage, loader)
-    }
-    
-    nonisolated private func append(_ content: PagingContent) async {
-        let itemsToAdd = direction == .top ? content.items.reversed() : content.items
-        var array = await direction == .top ? self.content.items.reversed() : self.content.items
-        var set = Set(array)
-        var allItemsAreTheSame = true // backend returned the same items for the next page, prevent for infinit loading
         
-        itemsToAdd.forEach {
-            if !set.contains($0) {
-                set.insert($0)
-                array.append($0)
-                allItemsAreTheSame = false
-            }
+        public func refresh() {
+            refresh(userInitiated: false)
         }
-        await update(content: PagingContent(direction == .top ? array.reversed() : array, next: allItemsAreTheSame ? nil : content.next))
-    }
-    
-    private func update(content: PagingContent) {
-        self.content = content
-    }
-    
-    public func initalRefresh() {
-        if state.value != .loading && content.items.isEmpty {
-            refresh()
-        }
-    }
-    
-    public func refresh() {
-        refresh(userInitiated: false)
-    }
-    
-    public func refresh(userInitiated: Bool) {
-        performOnRefresh?()
         
-        paramenters.loader.run(userInitiated ? .alertOnFail : (content.items.isEmpty ? initialLoading : .none), id: feedId) { [weak self] _ in
-            self?.state.value = .loading
+        public func refresh(userInitiated: Bool) {
+            performOnRefresh?()
             
-            do {
-                if let result = try await self?.paramenters.loadPage(nil),
-                   let equal = await self?.content.isEqual(result) {
-                    
-                    self?.state.value = .stop
-                    if !equal {
-                        self?.content = result
-                        self?.firstPageCache?.save(result.items as! [Item])
-                    }
+            loader.run(userInitiated ? .alertOnFail : (contentState.content.items.isEmpty ? initialLoading : .none),
+                       id: feedId) { [weak self] _ in
+                
+                self?.loadingState.value = .loading
+                
+                do {
+                    try await self?.contentState.refresh()
+                    self?.loadingState.value = .stop
+                } catch {
+                    self?.loadingState.process(error)
+                    throw error
                 }
-            } catch {
-                self?.state.process(error)
-                throw error
             }
         }
-    }
-    
-    public func loadMore() {
-        guard let next = content.next else { return }
-        state.value = .loading
         
-        paramenters.loader.run(.none, id: feedId) { [weak self] _ in
-            do {
-                if let result = try await self?.paramenters.loadPage(next) {
-                    await self?.append(result)
-                    self?.state.value = .stop
+        public func loadMore() {
+            guard contentState.content.next != nil else { return }
+            loadingState.value = .loading
+            
+            loader.run(.none, id: feedId) { [weak self] _ in
+                do {
+                    try await self?.contentState.loadMore()
+                    self?.loadingState.value = .stop
+                } catch {
+                    self?.loadingState.process(error)
+                    throw error
                 }
-            } catch {
-                self?.state.process(error)
-                throw error
             }
         }
     }
+}
+
+public enum Direction {
+    case bottom
+    case top
+}
+
+public extension Paging.Loader where ContentState == Paging.CommonState {
     
-    public func resetFail() {
-        if case .failed(_) = state.value {
-            state.reset()
-        }
+    convenience init(initialLoading: LoadingHelper.Presentation = .opaque,
+                     loader: LoadingHelper) {
+        self.init(initialLoading: initialLoading, loader: loader, contentState: .init(direction: .bottom))
     }
+}
+
+extension Paging {
+    public typealias CommonLoader = Loader<CommonState>
     
-    public func loadMoreIfAllowed() {
-        if content.next != nil && state.value == .stop && shouldLoadMore() {
-            loadMore()
+    public final class CommonState: PagingContentState, ObservableObject {
+        
+        private let direction: Direction
+        private let cache: Cache?
+        @AtomicPublished public var content = Page<Item>()
+        
+        public var loadPage: ((_ offset: AnyHashable?) async throws -> Page<Item>)!
+        
+        public init(direction: Direction, cache: Cache? = nil) {
+            self.direction = direction
+            self.cache = cache
+            
+            if let items = cache?.load() {
+                content = Page(items: items)
+            }
         }
-    }
-    
-    public func retry() {
-        if content.next != nil {
-            loadMoreIfAllowed()
-        } else {
-            refresh(userInitiated: true)
+        
+        public func refresh() async throws {
+            let result = try await loadPage(nil)
+            let equal = content == result
+            
+            if !equal {
+                content = result
+                cache?.save(result.items)
+            }
+        }
+        
+        public func loadMore() async throws {
+            guard let next = content.next else { return }
+            
+            let result = try await loadPage(next)
+            await append(result)
+        }
+        
+        private func append(_ content: Page<Item>) async {
+            let itemsToAdd = direction == .top ? content.items.reversed() : content.items
+            var array = direction == .top ? self.content.items.reversed() : self.content.items
+            var set = Set(array)
+            var allItemsAreTheSame = true // backend returned the same items for the next page, prevent infinit loading
+            
+            itemsToAdd.forEach {
+                if !set.contains($0) {
+                    set.insert($0)
+                    array.append($0)
+                    allItemsAreTheSame = false
+                }
+            }
+            self.content = .init(items: direction == .top ? array.reversed() : array,
+                                 next: allItemsAreTheSame ? nil : content.next)
         }
     }
 }

@@ -9,6 +9,7 @@ import AppKit
 #endif
 import Combine
 import SwiftUI
+import CommonUtils
 
 public struct FoolterLoadingView: View {
     

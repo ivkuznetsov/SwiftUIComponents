@@ -5,6 +5,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import CommonUtils
 
 #if os(iOS)
 final class RefreshControl: UIRefreshControl {
@@ -37,17 +38,17 @@ public final class ListTracker<List: ListContainer>: NSObject {
     public let list: List
     public var loadMoreView: ((LoadingState, _ retry: @escaping ()->())->any View) = { FoolterLoadingView(state: $0, retry: $1) }
     
-    private var stateObserver: AnyCancellable?
-    private(set) var paging: (any PagingProtocol)?
+    private var loadingObserver: AnyCancellable?
+    private(set) var paging: (any ObservablePagingLoader)?
     private var footerVisible = false
     
-    public func set(paging: (any PagingProtocol)?) {
+    public func set(paging: (any ObservablePagingLoader)?) {
         if self.paging === paging { return }
         self.paging = paging
         
         #if os(iOS)
-        stateObserver = paging?.state.$value.sink { [weak self] state in
-            if state != .loading {
+        loadingObserver = paging?.loadingState.$value.sink { [weak self] in
+            if $0 != .loading {
                 self?.endRefreshing()
             }
         }
@@ -74,20 +75,22 @@ public final class ListTracker<List: ListContainer>: NSObject {
             #if os(iOS)
             hasRefresh = list.content.view.scrollView.refreshControl != nil
             #endif
+             
+            let anyContent = paging.contentState.anyContent
             
-            if (!hasRefresh && paging.content.items.isEmpty) || paging.content.next != nil {
-                result.add(loadMoreView(paging.state, { [weak self] in
-                    self?.paging?.retry()
+            if (!hasRefresh && anyContent.items.isEmpty) || anyContent.next != nil {
+                
+                result.add(loadMoreView(paging.loadingState, { [weak self] in
+                    self?.retry()
                 }).onBecomingVisible(perform: { [weak self] visible in
-                    self?.footerVisible = visible
+                    guard let wSelf = self else { return }
                     
-                    if !visible {
-                        self?.paging?.resetFail()
-                    }
+                    wSelf.footerVisible = visible
                     
-                    if self?.isFooterVisible == true {
-                        self?.paging?.loadMoreIfAllowed()
+                    if !visible, case .failed(_) = wSelf.paging?.loadingState.value {
+                        wSelf.paging?.loadingState.reset()
                     }
+                    wSelf.loadMoreIfAllowed()
                 }).inContainer(), sectionId: pagingLoadingSectionId)
             }
         }
@@ -95,10 +98,24 @@ public final class ListTracker<List: ListContainer>: NSObject {
         Task {
             await list.content.set(result, animated: animated)
             await MainActor.run {
-                if isFooterVisible {
-                    paging?.loadMoreIfAllowed()
-                }
+                loadMoreIfAllowed()
             }
+        }
+    }
+    
+    private func retry() {
+        if let paging = paging {
+            if paging.contentState.anyContent.next != nil {
+                paging.loadMore()
+            } else {
+                paging.refresh(userInitiated: true)
+            }
+        }
+    }
+    
+    private func loadMoreIfAllowed() {
+        if isFooterVisible && paging?.loadingState.value == .stop {
+            paging?.loadMore()
         }
     }
     
