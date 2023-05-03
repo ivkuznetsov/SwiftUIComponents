@@ -25,7 +25,8 @@ public final class AlertPresenter: ObservableObject {
     
     @Published fileprivate var alerts: [Info] = []
     
-    public func show<A: View, M: View>(title: String = Bundle.main.infoDictionary!["CFBundleDisplayName"] as! String,
+    public func show<A: View, M: View>(title: String = Bundle.main.infoDictionary!["CFBundleDisplayName"] as? String ??
+                                                       Bundle.main.infoDictionary!["CFBundleName"] as? String ?? "",
                                        @ViewBuilder _ message: @escaping ()->M,
                                        @ViewBuilder actions: @escaping ()->A) {
         alerts.append(.init(title: title, actions: { actions().asAny }, message: { message().asAny }))
