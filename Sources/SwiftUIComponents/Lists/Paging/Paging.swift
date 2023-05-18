@@ -72,7 +72,7 @@ extension Paging {
         
         public var performOnRefresh: (()->())? = nil
         
-        @RePublish public var contentState: ContentState
+        @RePublished public var contentState: ContentState
         
         public init(initialLoading: LoadingHelper.Presentation = .opaque,
                     loader: LoadingHelper,
