@@ -9,9 +9,58 @@ import Foundation
 import SwiftUI
 import CommonUtils
 
-public protocol Coordinator: ObservableObject, Hashable {
+public protocol NavigationPathProtocol {
+    mutating func append<V: Hashable>(_ value: V)
     
-    var presenter: (any ModalCoordinator)? { get set }
+    mutating func removeLast(_ k: Int)
+    
+    var count: Int { get }
+    
+    init<V: Hashable>(_ elements: [V])
+}
+
+public protocol ScreenProtocol: Hashable { }
+
+public enum ModalStyle {
+    case sheet
+    case cover
+    case overlay
+}
+
+public protocol ModalProtocol: Hashable, Identifiable, Extractable {
+    
+    var style: ModalStyle { get }
+    
+    var coordinator: (any Coordinator)? { get }
+}
+
+public extension ModalProtocol {
+    
+    var style: ModalStyle {
+        coordinator == nil ? .sheet : .cover
+    }
+    
+    var coordinator: (any Coordinator)? {
+        extractValue(of: (any Coordinator).self)
+    }
+    
+    var id: Int { hashValue }
+}
+
+public protocol Coordinator: ObservableObject, Hashable {
+    associatedtype Path: NavigationPathProtocol
+    associatedtype Screen: ScreenProtocol
+    associatedtype Modal: ModalProtocol
+    associatedtype ModalView: View
+    associatedtype ScreenView: View
+    
+    var state: CoordinatorState<Path, Screen, Modal> { get }
+    
+    @ViewBuilder func destination(for screen: Screen) -> ScreenView
+    
+    @ViewBuilder func modalDestination(for modal: Modal) -> ModalView
+    
+    func dismiss()
 }
 
 extension Coordinator {
@@ -23,14 +72,63 @@ extension Coordinator {
     public static func == (lhs: Self, rhs: Self) -> Bool { lhs.hashValue == rhs.hashValue }
 }
 
-open class BaseCoordinator<Path: NavigationPathProtocol, Screen: Hashable, ModalFlow: ModalFlowProtocol>: ObservableObject {
+public extension Coordinator {
     
-    public var presenter: (any ModalCoordinator)?
+    func set(presenter: any Coordinator) {
+        state.set(presenter: presenter)
+    }
     
-    @Published public var path = PathContainer(Path.init([Screen]()))
-
-    @Published public var presented: ModalFlow?
+    func present(_ flow: Modal) {
+        InputState.closeKeyboard()
+        flow.coordinator?.set(presenter: self)
+        state.presented = flow
+    }
     
-    public init() { }
+    func dismiss() {
+        state.presenter?.dismissPresented()
+    }
+    
+    func dismissPresented() {
+        InputState.closeKeyboard()
+        state.dismiss()
+    }
+    
+    func present(_ screen: Screen) {
+        InputState.closeKeyboard()
+        state.append(screen)
+    }
+    
+    func pop() {
+        InputState.closeKeyboard()
+        state.pop()
+    }
+    
+    func popToRoot() {
+        InputState.closeKeyboard()
+        state.popToRoot()
+    }
+    
+    @discardableResult
+    func popTo(where condition: (AnyHashable) -> Bool) -> Bool {
+        state.popTo(where: condition)
+    }
+    
+    @discardableResult
+    func popTo(_ element: AnyHashable) -> Bool {
+        popTo(where: { $0 == element })
+    }
 }
 
+public enum NoModals: ModalProtocol { }
+
+public extension Coordinator where Modal == NoModals {
+    
+    func modalDestination(for modal: Modal) -> EmptyView { EmptyView() }
+}
+
+public enum NoScreens: ScreenProtocol { }
+
+public extension Coordinator where Screen == NoScreens {
+    
+    func destination(for screen: Screen) -> EmptyView { EmptyView() }
+}

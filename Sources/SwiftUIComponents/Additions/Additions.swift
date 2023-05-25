@@ -20,6 +20,28 @@ public extension AnyTransition {
     }
 }
 
+struct MovePositionModifier: ViewModifier {
+    let presented: Bool
+    let inverse: Bool
+    let edge: ()->Edge
+    
+    func body(content: Content) -> some View {
+        content.offset(x: presented ? 0 : (UIScreen.main.bounds.width * (edge() == .leading ? 1 : -1) * (inverse ? -1 : 1)))
+    }
+}
+
+public extension AnyTransition {
+    
+    static func move(edge: @escaping ()->Edge) -> AnyTransition {
+        .asymmetric(insertion: .modifier(active: MovePositionModifier(presented: false, inverse: false, edge: edge),
+                                         identity: MovePositionModifier(presented: true, inverse: false, edge: edge)),
+                    removal: .modifier(active: MovePositionModifier(presented: false, inverse: true, edge: edge),
+                                       identity: MovePositionModifier(presented: true, inverse: true, edge: edge)))
+        
+        
+    }
+}
+
 public extension Binding {
     
     func optional() -> Binding<Value?> {

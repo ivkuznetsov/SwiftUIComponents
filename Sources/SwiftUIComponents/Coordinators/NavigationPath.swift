@@ -12,37 +12,42 @@ import SwiftUI
 extension NavigationPath: NavigationPathProtocol { }
 
 @available(iOS 16.0, *)
-public extension PathContainer {
-    
-    static func make() -> PathContainer<NavigationPath> { .init(.init()) }
-}
+typealias CommonCoordinatorState<Screen: ScreenProtocol, Modal: ModalProtocol> = CoordinatorState<NavigationPath, Screen, Modal>
 
 @available(iOS 16.0, *)
 public extension View {
     
-    func withNavigation<C: NavigationCoordinator>(_ coordinator: C) -> some View where C.Path == NavigationPath  {
-        modifier(NavigationModifer(coordinator: coordinator))
-    }
-    
-    func with<C: NavigationCoordinator & ModalCoordinator>(_ coordinator: C) -> some View where C.Path == NavigationPath {
-        withNavigation(coordinator).withModal(coordinator)
+    func with<C: Coordinator>(_ coordinator: C) -> some View where C.Path == NavigationPath {
+        modifier(NavigationModifer(coordinator: coordinator)).withModal(coordinator)
     }
 }
 
 @available(iOS 16.0, *)
-public struct NavigationModifer<Coordinator: NavigationCoordinator>: ViewModifier where Coordinator.Path == NavigationPath {
+public extension Coordinator where Path == NavigationPath {
     
-    let coordinator: Coordinator
-    @ObservedObject var path: PathContainer<Coordinator.Path>
+    func view(for screen: Screen) -> some View {
+        destination(for: screen).with(self)
+    }
     
-    init(coordinator: Coordinator) {
+    func view(for modal: Modal) -> some View {
+        modalDestination(for: modal).with(self)
+    }
+}
+
+@available(iOS 16.0, *)
+public struct NavigationModifer<C: Coordinator>: ViewModifier where C.Path == NavigationPath {
+    
+    let coordinator: C
+    @ObservedObject var state: CommonCoordinatorState<C.Screen, C.Modal>
+    
+    init(coordinator: C) {
         self.coordinator = coordinator
-        self.path = coordinator.path
+        self.state = coordinator.state
     }
     
     public func body(content: Content) -> some View {
-        NavigationStack(path: $path.path) {
-            content.navigationDestination(for: Coordinator.Screen.self) {
+        NavigationStack(path: $state.path) {
+            content.navigationDestination(for: C.Screen.self) {
                 coordinator.destination(for: $0)
             }
         }.navigationViewStyle(.stack)
