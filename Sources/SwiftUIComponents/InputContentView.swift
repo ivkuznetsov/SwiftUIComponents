@@ -45,19 +45,20 @@ public final class InputState: ObservableObject {
     
     fileprivate init() {
         NotificationCenter.default.publisher(for: UIApplication.keyboardWillChangeFrameNotification)
-            .sinkOnMain(retained: self, dropFirst: false) { [unowned self] notification in
-            
+            .sinkOnMain(retained: self, dropFirst: false) { [weak self] notification in
+                guard let wSelf = self else { return }
+                
                 let keyboardFrame = notification.userInfo?[UIWindow.keyboardFrameEndUserInfoKey] as? CGRect ?? .zero
                 
-                withAnimation(animation(from: notification)) {
+                withAnimation(wSelf.animation(from: notification)) {
                     if keyboardFrame.minY + keyboardFrame.height >= UIScreen.main.bounds.height {
-                        keyboardInset = UIScreen.main.bounds.height - keyboardFrame.minY
-                        if let focused = focused {
-                            scrollToItem.send(focused)
+                        wSelf.keyboardInset = UIScreen.main.bounds.height - keyboardFrame.minY
+                        if let focused = wSelf.focused {
+                            wSelf.scrollToItem.send(focused)
                         }
                     } else {
-                        keyboardInset = 0
-                        focused = nil
+                        wSelf.keyboardInset = 0
+                        wSelf.focused = nil
                     }
                 }
         }
@@ -99,19 +100,13 @@ public extension View {
     }
 }
 
-public struct InputContentView<Content: View>: View {
+private struct InputGesturesModifer: ViewModifier {
     
-    @StateObject private var state = InputState()
+    @ObservedObject var state: InputState
     
-    private let content: (InputState)->Content
-    
-    public init(_ content: @escaping (_ inputState: InputState)->Content) {
-        self.content = content
-    }
-    
-    @ViewBuilder private var contentWithGesture: some View {
+    func body(content: Content) -> some View {
         if #available(iOS 16, *) {
-            content(state).gesture(SpatialTapGesture(coordinateSpace: .global).onEnded { value in
+            content.gesture(SpatialTapGesture(coordinateSpace: .global).onEnded { value in
                 
                 if let window = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first,
                    let view = window.hitTest(value.location, with: nil),
@@ -120,15 +115,26 @@ public struct InputContentView<Content: View>: View {
                 }
             }, including: state.keyboardPresented ? .all : .subviews)
         } else {
-            content(state).gesture(TapGesture().onEnded { _ in
+            content.gesture(TapGesture().onEnded { _ in
                 state.closeKeyboard()
             }, including: state.keyboardPresented ? .all : .subviews)
         }
     }
+}
+
+public struct InputContentView<Content: View>: View {
+    
+    @State private var state = InputState()
+    
+    private let content: (InputState)->Content
+    
+    public init(_ content: @escaping (_ inputState: InputState)->Content) {
+        self.content = content
+    }
     
     public var body: some View {
         ScrollViewReader { proxy in
-            contentWithGesture.onReceive(state.scrollToItem) {
+            content(state).modifier(InputGesturesModifer(state: state)).onReceive(state.scrollToItem) {
                 proxy.scrollTo($0, anchor: .center)
             }
         }

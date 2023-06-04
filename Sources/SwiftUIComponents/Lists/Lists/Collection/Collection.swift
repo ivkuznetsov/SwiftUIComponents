@@ -50,6 +50,21 @@ public extension Snapshot where View == CollectionView {
             }
         }, reuseId: { _ in reuseId }, additions: .init(layout: layout)))
     }
+    
+    private var viewContainerInfo: Section {
+        Section(ViewContainer.self, fill: {
+            $1.contentConfiguration = $0.configuration
+        }, reuseId: { $0.reuseId })
+    }
+    
+    mutating func addSection<T: SwiftUI.View>(_ view: T, staticHeight: CGFloat) {
+        addSection([view.inContainer()], section: .init(ViewContainer.self,
+                                                        fill: {
+            $1.contentConfiguration = $0.configuration
+        }, reuseId: { $0.reuseId }, additions: .init(layout: {
+            .grid(height: staticHeight, estimatedHeight: staticHeight, $0)
+        })))
+    }
 }
 
 @MainActor

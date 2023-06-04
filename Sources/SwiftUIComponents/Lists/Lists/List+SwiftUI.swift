@@ -28,26 +28,36 @@ public struct Layout<List: ListContainer>: UIViewControllerRepresentable {
     private let snapshot: Snapshot<List.View>
     private let setup: ((List)->())?
     private let emptyState: any View
+    private let didSet: (()->())?
     
     public init(_ views: [ViewContainer], setup: ((List)->())? = nil) {
-        self.init({ $0.addSection(views) }, setup: setup)
+        self.init(setup: setup, { $0.addSection(views) })
     }
     
-    public init(emptyState: any View = EmptyView(), _ data: (inout Snapshot<List.View>)->(), setup: ((List)->())? = nil) {
+    public init(emptyState: any View = EmptyView(),
+                setup: ((List)->())? = nil,
+                didSet: (()->())? = nil,
+                _ data: (inout Snapshot<List.View>)->()) {
         var snapshot = Snapshot<List.View>()
         data(&snapshot)
         self.snapshot = snapshot
         self.setup = setup
+        self.didSet = didSet
         self.emptyState = emptyState
     }
     
     public func makeUIViewController(context: Context) -> UIViewControllerType {
-        UIViewControllerType()
+        let vc = UIViewControllerType()
+        setup?(vc.list)
+        return vc
     }
     
     public func updateUIViewController(_ uiViewController: UIViewControllerType, context: Context) {
         uiViewController.list.content.emptyState.rootView = emptyState.asAny
-        uiViewController.list.content.set(snapshot, animated: true)
+        Task { @MainActor in
+            await uiViewController.list.content.set(snapshot, animated: true)
+            didSet?()
+        }
     }
 }
 #endif

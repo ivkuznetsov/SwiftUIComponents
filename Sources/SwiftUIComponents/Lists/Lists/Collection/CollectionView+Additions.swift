@@ -22,6 +22,8 @@ public final class CollectionView: PlatformCollectionView, ListView {
     public typealias Cell = PlatformCollectionCell
     public typealias Content = PlatformCollectionDataSource
     
+    public var attachedContentToTheBottom: Bool = false
+    
     public var scrollView: PlatformScrollView {
         #if os(iOS)
         self
@@ -48,6 +50,21 @@ public final class CollectionView: PlatformCollectionView, ListView {
         alwaysBounceVertical = true
         contentInsetAdjustmentBehavior = .automatic
         showsHorizontalScrollIndicator = false
+    }
+    
+    public override var bounds: CGRect {
+        didSet {
+            if bounds.height != oldValue.height, attachedContentToTheBottom {
+                let offset = oldValue.height - frame.height
+                
+                if offset > 0 {
+                    var contentOffset = self.contentOffset
+                    contentOffset.y += offset
+                    contentOffset.y = min(contentOffset.y, max(0, contentSize.height - bounds.size.height))
+                    self.contentOffset = contentOffset
+                }
+            }
+        }
     }
     
     public override func touchesShouldCancel(in view: UIView) -> Bool {

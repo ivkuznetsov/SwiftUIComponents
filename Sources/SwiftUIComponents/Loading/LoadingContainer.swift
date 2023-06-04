@@ -25,17 +25,17 @@ public struct LoadingContainer<Content: View>: View {
     
     private let loadingView: (LoadingHelper.TaskWrapper)-> any LoadingViewProtocol
     private let failedView: (LoadingHelper.Fail)-> any FailedViewProtocol
-    private let content: ()->Content
+    private let content: Content
     @State private var nonblockingFail: LoadingHelper.Fail?
     
     public init(_ helper: LoadingHelper,
                 loadingView: @escaping (LoadingHelper.TaskWrapper) -> any LoadingViewProtocol = { LoadingView(task: $0) },
                 failedView: @escaping (LoadingHelper.Fail) -> any FailedViewProtocol = { FailedView(fail: $0) },
-                content: @escaping () -> Content) {
+                content: ()->Content) {
         self.helper = helper
         self.loadingView = loadingView
         self.failedView = failedView
-        self.content = content
+        self.content = content()
     }
     
     private var loading: some View {
@@ -57,7 +57,7 @@ public struct LoadingContainer<Content: View>: View {
     }
     
     public var body: some View {
-        content().overlay {
+        content.overlay {
             if let fail = nonblockingFail {
                 FailedBar(fail: fail).transition(.slideWithOpacity).onAppear {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {

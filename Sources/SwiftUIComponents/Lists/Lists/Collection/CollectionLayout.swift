@@ -26,14 +26,15 @@ public extension NSCollectionLayoutSection {
     #endif
     
     static func grid(height: CGFloat? = nil,
+                     estimatedHeight: CGFloat = 150,
                      _ environment: NSCollectionLayoutEnvironment,
                      spacing: NSDirectionalEdgeInsets = .init(top: 0, leading: 0, bottom: 0, trailing: 0)) -> NSCollectionLayoutSection {
         let itemSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
-                                              heightDimension: height != nil ? .absolute(height!) : .estimated(150))
+                                              heightDimension: height != nil ? .absolute(height!) : .estimated(estimatedHeight))
         let item = NSCollectionLayoutItem(layoutSize: itemSize)
         
         let groupSize = NSCollectionLayoutSize(widthDimension: .fractionalWidth(1.0),
-                                               heightDimension: .estimated(150))
+                                               heightDimension: .estimated(estimatedHeight))
         let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
         let section = NSCollectionLayoutSection(group: group)
         section.contentInsets = spacing

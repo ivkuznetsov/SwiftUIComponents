@@ -25,7 +25,7 @@ public final class ListContent<View: ListView> {
     public let emptyState = UIHostingController(rootView: AnyView(EmptyView()))
     public let delegate = DelegateForwarder()
     
-    var dataSource: View.Content!
+    public internal(set) var dataSource: View.Content!
     private let serialUpdate = SerialTasks()
     var oldSnapshot: Snapshot<View>?
     
@@ -71,10 +71,24 @@ public final class ListContent<View: ListView> {
             self.update(snapshot: snapshot)
             await self.dataSource.apply(snapshot.data, animated: animatedResult)
             
+            let wasAttached = self.emptyState.view.superview != nil
+            
             if self.showNoData(snapshot.data) {
                 self.view.attach(self.emptyState.view, type: .safeArea)
+                self.view.scrollView.isScrollEnabled = false
             } else {
                 self.emptyState.view.removeFromSuperview()
+                self.view.scrollView.isScrollEnabled = true
+            }
+            
+            let isAttached = self.emptyState.view.superview != nil
+            
+            if animated && !isAttached && wasAttached {
+                let transition = CATransition()
+                transition.type = .fade
+                transition.duration = 0.15
+                transition.fillMode = .both
+                self.view.layer.add(transition, forKey: "fade")
             }
         }
     }
