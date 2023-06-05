@@ -8,7 +8,7 @@ import CommonUtils
 #if os(iOS)
 
 @available (iOS 15, *)
-public struct LoadingView: LoadingViewProtocol {
+public struct LoadingView: View {
     
     private struct CircularProgressView: View {
         

@@ -8,7 +8,7 @@ import CommonUtils
 #if os(iOS)
 
 @available (iOS 15, *)
-public struct FailedView: FailedViewProtocol {
+public struct FailedView: View {
     
     private let fail: LoadingHelper.Fail
     private let backgroundColor: Color

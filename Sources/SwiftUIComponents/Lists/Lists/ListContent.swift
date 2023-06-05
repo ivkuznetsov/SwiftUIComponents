@@ -34,6 +34,7 @@ public final class ListContent<View: ListView> {
     
     init(view: View) {
         self.view = view
+        emptyState.view.backgroundColor = .clear
     }
     
     #if os(iOS)

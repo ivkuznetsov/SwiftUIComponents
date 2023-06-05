@@ -7,30 +7,20 @@ import CommonUtils
 
 #if os(iOS)
 
-public protocol FailedViewProtocol: View {
-    
-    init(fail: LoadingHelper.Fail)
-}
-
-public protocol LoadingViewProtocol: View {
-    
-    init(task: LoadingHelper.TaskWrapper)
-}
-
 @available (iOS 15, *)
 public struct LoadingContainer<Content: View>: View {
     
     @EnvironmentObject private var alerts: AlertPresenter
     @ObservedObject public var helper: LoadingHelper
     
-    private let loadingView: (LoadingHelper.TaskWrapper)-> any LoadingViewProtocol
-    private let failedView: (LoadingHelper.Fail)-> any FailedViewProtocol
+    private let loadingView: (LoadingHelper.TaskWrapper)-> AnyView
+    private let failedView: (LoadingHelper.Fail)-> AnyView
     private let content: Content
     @State private var nonblockingFail: LoadingHelper.Fail?
     
     public init(_ helper: LoadingHelper,
-                loadingView: @escaping (LoadingHelper.TaskWrapper) -> any LoadingViewProtocol = { LoadingView(task: $0) },
-                failedView: @escaping (LoadingHelper.Fail) -> any FailedViewProtocol = { FailedView(fail: $0) },
+                loadingView: @escaping (LoadingHelper.TaskWrapper) -> AnyView = { LoadingView(task: $0).asAny },
+                failedView: @escaping (LoadingHelper.Fail) -> AnyView = { FailedView(fail: $0).asAny },
                 content: ()->Content) {
         self.helper = helper
         self.loadingView = loadingView
@@ -58,17 +48,19 @@ public struct LoadingContainer<Content: View>: View {
     
     public var body: some View {
         content.overlay {
-            if let fail = nonblockingFail {
-                FailedBar(fail: fail).transition(.slideWithOpacity).onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                        withAnimation(.easeIn) { nonblockingFail = nil }
+            ZStack {
+                if let fail = nonblockingFail {
+                    FailedBar(fail: fail).transition(.slideWithOpacity).onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            withAnimation(.easeIn) { nonblockingFail = nil }
+                        }
                     }
                 }
+                if let fail = helper.opaqueFail {
+                    failedView(fail)
+                }
+                loading
             }
-            if let fail = helper.opaqueFail {
-                failedView(fail).asAny
-            }
-            loading
         }.onReceive(helper.didFail, perform: { fail in
             switch fail.presentation {
             case .translucent, .alertOnFail:
