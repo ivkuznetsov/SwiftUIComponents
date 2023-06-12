@@ -70,7 +70,6 @@ public final class ListContent<View: ListView> {
         try? await serialUpdate.run { @MainActor [oldSnapshot = self.snapshot] in
             let animatedResult = animated && oldSnapshot.data.numberOfItems > 0 && snapshot.data.numberOfItems > 0
             self.update(snapshot: snapshot)
-            await self.dataSource.apply(snapshot.data, animated: animatedResult)
             
             let wasAttached = self.emptyState.view.superview != nil
             
@@ -91,6 +90,8 @@ public final class ListContent<View: ListView> {
                 transition.fillMode = .both
                 self.view.layer.add(transition, forKey: "fade")
             }
+            
+            await self.dataSource.apply(snapshot.data, animated: animatedResult)
         }
     }
     
