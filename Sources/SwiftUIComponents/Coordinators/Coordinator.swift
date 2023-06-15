@@ -9,6 +9,12 @@ import Foundation
 import SwiftUI
 import CommonUtils
 
+public extension CoordinateSpace {
+    
+    static let navController = "CoordinatorSpaceNavigationController"
+    static let modal = "CoordinatorSpaceModal"
+}
+
 public protocol NavigationPathProtocol {
     mutating func append<V: Hashable>(_ value: V)
     
@@ -80,8 +86,20 @@ public extension Coordinator {
     
     func present(_ flow: Modal) {
         InputState.closeKeyboard()
-        flow.coordinator?.set(presenter: self)
-        state.presented = flow
+        
+        let present = {
+            flow.coordinator?.set(presenter: self)
+            self.state.presented = flow
+        }
+        
+        if state.presented != nil {
+            dismissPresented()
+            DispatchQueue.main.async {
+                present()
+            }
+        } else {
+            present()
+        }
     }
     
     func dismiss() {

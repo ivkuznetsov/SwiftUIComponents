@@ -74,7 +74,19 @@ public final class ListContent<View: ListView> {
             let wasAttached = self.emptyState.view.superview != nil
             
             if self.showNoData(snapshot.data) {
-                self.view.attach(self.emptyState.view, type: .safeArea)
+                let emptyView = self.emptyState.view!
+                let layoutGuide = self.view.safeAreaLayoutGuide
+                
+                emptyView.translatesAutoresizingMaskIntoConstraints = false
+                self.view.addSubview(emptyView)
+                
+                layoutGuide.leftAnchor.constraint(equalTo: emptyView.leftAnchor).isActive = true
+                layoutGuide.rightAnchor.constraint(equalTo: emptyView.rightAnchor).isActive = true
+                layoutGuide.topAnchor.constraint(equalTo: emptyView.topAnchor).isActive = true
+                let constraint = layoutGuide.bottomAnchor.constraint(equalTo: emptyView.bottomAnchor)
+                constraint.priority = .init(700)
+                constraint.isActive = true
+                
                 self.view.scrollView.isScrollEnabled = false
             } else {
                 self.emptyState.view.removeFromSuperview()

@@ -21,14 +21,18 @@ fileprivate struct ModalModifer<C: Coordinator>: ViewModifier {
     func body(content: Content) -> some View {
         content.overlay {
             if let presented = coordinator.state.presented, presented.style == .overlay {
-                coordinator.modalDestination(for: presented).environmentObject(coordinator)
+                coordinator.modalDestination(for: presented)
+                    .environmentObject(coordinator)
+                    .coordinateSpace(name: CoordinateSpace.modal)
             }
         }.sheet(isPresented: .init(get: { coordinator.state.presented?.style == .sheet },
                                    set: { _ in coordinator.dismissPresented() })) {
             coordinator.modalDestination(for: coordinator.state.presented!)
+                .coordinateSpace(name: CoordinateSpace.modal)
         }.fullScreenCover(isPresented: .init(get: { coordinator.state.presented?.style == .cover },
                                              set: { _ in coordinator.dismissPresented() })) {
             coordinator.modalDestination(for: coordinator.state.presented!)
+                .coordinateSpace(name: CoordinateSpace.modal)
         }
     }
 }

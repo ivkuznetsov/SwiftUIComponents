@@ -50,7 +50,8 @@ public struct NavigationModifer<C: Coordinator>: ViewModifier where C.Path == Na
             content.navigationDestination(for: C.Screen.self) {
                 coordinator.destination(for: $0)
             }
-        }.navigationViewStyle(.stack)
+        }.coordinateSpace(name: CoordinateSpace.navController)
+            .navigationViewStyle(.stack)
             .environmentObject(coordinator)
     }
 }
