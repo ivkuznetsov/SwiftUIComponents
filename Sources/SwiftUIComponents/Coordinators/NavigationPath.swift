@@ -12,7 +12,7 @@ import SwiftUI
 extension NavigationPath: NavigationPathProtocol { }
 
 @available(iOS 16.0, *)
-typealias CommonCoordinatorState<Screen: ScreenProtocol, Modal: ModalProtocol> = CoordinatorState<NavigationPath, Screen, Modal>
+public typealias CommonCoordinatorState<Screen: ScreenProtocol, Modal: ModalProtocol> = CoordinatorState<NavigationPath, Screen, Modal>
 
 @available(iOS 16.0, *)
 public extension View {
@@ -39,6 +39,7 @@ public struct NavigationModifer<C: Coordinator>: ViewModifier where C.Path == Na
     
     let coordinator: C
     @ObservedObject var state: CommonCoordinatorState<C.Screen, C.Modal>
+    @State var currentPath = NavigationPath() // we cannot use NavigationPath in @Publiched because of bug in modal sheet, where the first push happens without animation
     
     init(coordinator: C) {
         self.coordinator = coordinator
@@ -46,12 +47,21 @@ public struct NavigationModifer<C: Coordinator>: ViewModifier where C.Path == Na
     }
     
     public func body(content: Content) -> some View {
-        NavigationStack(path: $state.path) {
+        NavigationStack(path: $currentPath) {
             content.navigationDestination(for: C.Screen.self) {
                 coordinator.destination(for: $0)
             }
         }.coordinateSpace(name: CoordinateSpace.navController)
             .navigationViewStyle(.stack)
             .environmentObject(coordinator)
+            .onChange(of: state.path, perform: {
+                if $0 != currentPath {
+                    currentPath = $0
+                }
+            }).onChange(of: currentPath, perform: {
+                if $0 != state.path {
+                    state.path = $0
+                }
+            })
     }
 }
