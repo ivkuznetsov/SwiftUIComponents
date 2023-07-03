@@ -10,7 +10,7 @@ import CommonUtils
 @available (iOS 15, *)
 public struct LoadingContainer<Content: View>: View {
     
-    @EnvironmentObject private var alerts: AlertPresenter
+    @StateObject @NonPublish private var alerts = AlertPresenter()
     @ObservedObject public var helper: LoadingHelper
     
     private let loadingView: (LoadingHelper.TaskWrapper)-> AnyView
@@ -61,7 +61,7 @@ public struct LoadingContainer<Content: View>: View {
                 }
                 loading
             }
-        }.onReceive(helper.didFail, perform: { fail in
+        }.alerts(alerts).onReceive(helper.didFail, perform: { fail in
             switch fail.presentation {
             case .translucent, .alertOnFail:
                 alerts.show({ Text(fail.error.localizedDescription) }, actions: {

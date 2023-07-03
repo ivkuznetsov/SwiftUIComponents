@@ -39,14 +39,10 @@ struct AlertModifier: ViewModifier {
     @EnvironmentObject var presenter: AlertPresenter
     
     func body(content: Content) -> some View {
-        content.overlay {
-            if let info = presenter.alerts.last {
-                Color.clear.alert(info.title,
-                                  isPresented: Binding(get: { true }, set: { _ in presenter.alerts.removeLast() }),
-                                  actions: info.actions,
-                                  message: info.message)
-            }
-        }
+        content.alert(presenter.alerts.last?.title ?? "",
+                      isPresented: Binding(get: { presenter.alerts.last != nil }, set: { _ in presenter.alerts.removeLast() } ),
+                      actions: presenter.alerts.last?.actions ?? { EmptyView().asAny },
+                      message: presenter.alerts.last?.message ?? { EmptyView().asAny })
     }
 }
 

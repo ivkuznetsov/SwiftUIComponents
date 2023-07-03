@@ -19,9 +19,11 @@ public final class CoordinatorState<T: NavigationPathProtocol, Screen: ScreenPro
     private(set) var elements: [Screen] = []
     
     public init() {
-        $path.sinkOnMain(retained: self) { [unowned self] path in
-            if path.count < elements.count {
-                elements = Array(elements.prefix(path.count))
+        $path.sinkOnMain(retained: self) { [weak self] path in
+            guard let wSelf = self else { return }
+            
+            if path.count < wSelf.elements.count {
+                wSelf.elements = Array(wSelf.elements.prefix(path.count))
             }
         }
     }

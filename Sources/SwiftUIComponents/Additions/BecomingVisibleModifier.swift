@@ -10,16 +10,20 @@ import SwiftUI
 import SwiftUI
 
 public extension UIApplication {
-    var keyWindow: UIWindow? {
+    var sceneKeyWindow: UIWindow? {
         connectedScenes.compactMap { $0 as? UIWindowScene }
             .flatMap { $0.windows }
             .first { $0.isKeyWindow }
+    }
+    
+    var colorScheme: UIUserInterfaceStyle {
+        UIApplication.shared.sceneKeyWindow?.traitCollection.userInterfaceStyle ?? .light
     }
 }
 
 private struct SafeAreaInsetsKey: EnvironmentKey {
     static var defaultValue: EdgeInsets {
-        UIApplication.shared.keyWindow?.safeAreaInsets.swiftUiInsets ?? EdgeInsets()
+        UIApplication.shared.sceneKeyWindow?.safeAreaInsets.swiftUiInsets ?? EdgeInsets()
     }
 }
 

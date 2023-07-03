@@ -62,6 +62,8 @@ public struct NavigationModifer<C: Coordinator>: ViewModifier where C.Path == Na
                 if $0 != state.path {
                     state.path = $0
                 }
-            })
+            }).onFirstAppear {
+                currentPath = coordinator.state.path
+            }
     }
 }
