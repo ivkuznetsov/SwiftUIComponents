@@ -67,7 +67,7 @@ extension Paging {
     
         private let initialLoading: LoadingHelper.Presentation
         private let feedId = UUID().uuidString
-        private let loader: LoadingHelper
+        public let loader: LoadingHelper
         public let loadingState = LoadingState()
         
         public var performOnRefresh: (()->())? = nil

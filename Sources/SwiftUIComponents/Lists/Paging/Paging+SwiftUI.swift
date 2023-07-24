@@ -27,6 +27,7 @@ public final class PagingListViewController<List: ListContainer>: ListViewContro
 public struct PagingLayout<List: ListContainer>: UIViewControllerRepresentable {
     
     private let refreshControl: Bool
+    private let animateChanges: Bool
     private let setup: ((ListTracker<List>)->())?
     
     private let snapshot: Snapshot<List.View>
@@ -34,12 +35,14 @@ public struct PagingLayout<List: ListContainer>: UIViewControllerRepresentable {
     private let updatePaging: (ListTracker<List>)->()
     
     public init<Loader: ObservablePagingLoader>(_ paging: Loader?,
-                                      refreshControl: Bool = true,
-                                      emptyState: any View = EmptyView(),
-                                      data: @escaping (inout Snapshot<List.View>, [Loader.ContentState.Item])->(),
-                                      setup: ((ListTracker<List>)->())? = nil) {
+                                                refreshControl: Bool = true,
+                                                animateChanges: Bool = true,
+                                                emptyState: any View = EmptyView(),
+                                                data: @escaping (inout Snapshot<List.View>, [Loader.ContentState.Item])->(),
+                                                setup: ((ListTracker<List>)->())? = nil) {
         self.init(any: paging,
                   refreshControl: refreshControl,
+                  animateChanges: animateChanges,
                   emptyState: emptyState,
                   data: { data(&$0, $1 as! [Loader.ContentState.Item]) },
                   setup: setup)
@@ -47,6 +50,7 @@ public struct PagingLayout<List: ListContainer>: UIViewControllerRepresentable {
     
     public init(any paging: (any ObservablePagingLoader)?,
                 refreshControl: Bool = true,
+                animateChanges: Bool = true,
                 emptyState: any View = EmptyView(),
                 data: @escaping (inout Snapshot<List.View>, [AnyHashable])->(),
                 setup: ((ListTracker<List>)->())? = nil) {
@@ -54,6 +58,7 @@ public struct PagingLayout<List: ListContainer>: UIViewControllerRepresentable {
         var snapshot = Snapshot<List.View>()
         data(&snapshot, paging?.contentState.anyContent.items ?? [])
         
+        self.animateChanges = animateChanges
         self.snapshot = snapshot
         self.refreshControl = refreshControl
         self.setup = setup
@@ -71,7 +76,13 @@ public struct PagingLayout<List: ListContainer>: UIViewControllerRepresentable {
         let oldPaging = uiViewController.tracker.paging
         updatePaging(uiViewController.tracker)
         uiViewController.list.content.emptyState.rootView = emptyState.asAny
-        uiViewController.tracker.set(snapshot, animated: oldPaging === uiViewController.tracker.paging)
+        
+        var animated = oldPaging === uiViewController.tracker.paging
+        
+        if animated, oldPaging?.contentState.anyContent.items.isEmpty == true || !animateChanges {
+            animated = false
+        }
+        uiViewController.tracker.set(snapshot, animated: animated)
     }
 }
 #endif
