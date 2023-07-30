@@ -9,144 +9,78 @@ import Foundation
 import SwiftUI
 import CommonUtils
 
+public typealias NavigationModalCoordinator = NavigationCoordinator & ModalCoordinator
+
 public extension CoordinateSpace {
     
     static let navController = "CoordinatorSpaceNavigationController"
     static let modal = "CoordinatorSpaceModal"
 }
 
-public protocol NavigationPathProtocol {
-    mutating func append<V: Hashable>(_ value: V)
-    
-    mutating func removeLast(_ k: Int)
-    
-    var count: Int { get }
-    
-    init<V: Hashable>(_ elements: [V])
-}
+public protocol Coordinator: ObservableObject, Hashable { }
 
-public protocol ScreenProtocol: Hashable { }
+private var coordinatorStateKey = "coordinatorStateKey"
 
-public enum ModalStyle {
-    case sheet
-    case cover
-    case overlay
-}
-
-public protocol ModalProtocol: Hashable, Identifiable, Extractable {
+public extension Coordinator {
     
-    var style: ModalStyle { get }
-    
-    var coordinator: (any Coordinator)? { get }
-}
-
-public extension ModalProtocol {
-    
-    var style: ModalStyle {
-        coordinator == nil ? .sheet : .cover
+    var state: NavigationState {
+        get {
+            if let state = objc_getAssociatedObject(self, &coordinatorStateKey) as? NavigationState {
+                return state
+            } else {
+                let state = NavigationState()
+                objc_setAssociatedObject(self, &coordinatorStateKey, state, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+                return state
+            }
+        }
+        set {
+            objc_setAssociatedObject(self, &coordinatorStateKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
     }
     
-    var coordinator: (any Coordinator)? {
-        extractValue(of: (any Coordinator).self)
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(ObjectIdentifier(self))
     }
     
-    var id: Int { hashValue }
-}
-
-public protocol Coordinator: ObservableObject, Hashable {
-    associatedtype Path: NavigationPathProtocol
-    associatedtype Screen: ScreenProtocol
-    associatedtype Modal: ModalProtocol
-    associatedtype ModalView: View
-    associatedtype ScreenView: View
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.hashValue == rhs.hashValue }
     
-    var state: CoordinatorState<Path, Screen, Modal> { get }
+    /// Dismiss current modal navigation
+    func dismiss() {
+        state.presentedBy?.dismissPresented()
+    }
     
-    @ViewBuilder func destination(for screen: Screen) -> ScreenView
+    /// Dismiss modal navigation presented over current navigation
+    func dismissPresented() {
+        state.modalPresented = nil
+    }
     
-    @ViewBuilder func modalDestination(for modal: Modal) -> ModalView
+    /// Move to previous screen of the current navigation
+    func pop() {
+        state.path.removeLast()
+    }
     
-    func dismiss()
+    /// Move to the first screen of the current navigation
+    func popToRoot() {
+        state.path.removeLast(state.path.count)
+    }
 }
 
 extension Coordinator {
     
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(ObjectIdentifier(self))
-    }
-    
-    public static func == (lhs: Self, rhs: Self) -> Bool { lhs.hashValue == rhs.hashValue }
-}
-
-public extension Coordinator {
-    
-    func set(presenter: any Coordinator) {
-        state.set(presenter: presenter)
-    }
-    
-    func present(_ flow: Modal) {
-        InputState.closeKeyboard()
-        
-        let present = {
-            flow.coordinator?.set(presenter: self)
-            self.state.presented = flow
-        }
-        
-        if state.presented != nil {
-            dismissPresented()
-            DispatchQueue.main.async {
-                present()
+    func present(_ presentation: ModalPresentation, type: PresentationType = .overAll) {
+        if let presentedCoordinator = state.modalPresented?.coordinator {
+            switch type {
+            case .replaceCurrent:
+                dismissPresented()
+                DispatchQueue.main.async { [weak self] in
+                    self?.present(presentation, type: type)
+                }
+            case .overAll:
+                presentedCoordinator.present(presentation, type: type)
             }
         } else {
-            present()
+            presentation.coordinator.state.presentedBy = self
+            state.modalPresented = presentation
         }
     }
-    
-    func dismiss() {
-        state.presenter?.dismissPresented()
-    }
-    
-    func dismissPresented() {
-        InputState.closeKeyboard()
-        state.dismiss()
-    }
-    
-    func present(_ screen: Screen) {
-        InputState.closeKeyboard()
-        state.append(screen)
-    }
-    
-    func pop() {
-        InputState.closeKeyboard()
-        state.pop()
-    }
-    
-    func popToRoot() {
-        InputState.closeKeyboard()
-        state.popToRoot()
-    }
-    
-    @discardableResult
-    func popTo(where condition: (AnyHashable) -> Bool) -> Bool {
-        state.popTo(where: condition)
-    }
-    
-    @discardableResult
-    func popTo(_ element: AnyHashable) -> Bool {
-        popTo(where: { $0 == element })
-    }
-}
-
-public enum NoModals: ModalProtocol { }
-
-public extension Coordinator where Modal == NoModals {
-    
-    func modalDestination(for modal: Modal) -> EmptyView { EmptyView() }
-}
-
-public enum NoScreens: ScreenProtocol { }
-
-public extension Coordinator where Screen == NoScreens {
-    
-    func destination(for screen: Screen) -> EmptyView { EmptyView() }
 }
