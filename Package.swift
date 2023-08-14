@@ -14,10 +14,11 @@ let package = Package(
                  targets: ["SwiftUIComponents"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/ivkuznetsov/CommonUtils.git", branch: "main")
+        .package(url: "https://github.com/ivkuznetsov/CommonUtils.git", from: .init(1, 1, 3)),
+        .package(url: "https://github.com/ivkuznetsov/Coordinators.git", from: .init(1, 0, 0))
     ],
     targets: [
         .target(name: "SwiftUIComponents",
-                dependencies: ["CommonUtils"])
+                dependencies: ["CommonUtils", "Coordinators"])
     ]
 )

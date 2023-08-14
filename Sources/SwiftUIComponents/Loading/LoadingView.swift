@@ -38,12 +38,14 @@ public struct LoadingView: View {
     }
     
     public var body: some View {
-        backgroundColor.opacity(task.presentation == .opaque ? 1 : 0.7).ignoresSafeArea()
-        
-        if task.progress > 0 {
-            CircularProgressView(progress: task.progress)
-        } else {
-            InCellProgressView(style: .big)
+        ZStack {
+            backgroundColor.opacity(task.presentation == .opaque ? 1 : 0.7).ignoresSafeArea()
+            
+            if task.progress > 0 {
+                CircularProgressView(progress: task.progress)
+            } else {
+                InCellProgressView(style: .big)
+            }
         }
     }
 }
