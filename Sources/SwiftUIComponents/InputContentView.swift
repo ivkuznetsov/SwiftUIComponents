@@ -45,7 +45,7 @@ public final class InputState: ObservableObject {
     
     fileprivate init() {
         NotificationCenter.default.publisher(for: UIApplication.keyboardWillChangeFrameNotification)
-            .sinkOnMain(retained: self, dropFirst: false) { [weak self] notification in
+            .sinkOnMain(retained: self) { [weak self] notification in
                 guard let wSelf = self else { return }
                 
                 let keyboardFrame = notification.userInfo?[UIWindow.keyboardFrameEndUserInfoKey] as? CGRect ?? .zero
