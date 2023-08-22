@@ -7,7 +7,6 @@
 import Foundation
 import UIKit
 import SwiftUI
-import CommonUtils
 import Combine
 
 private extension UISpringTimingParameters {
@@ -24,7 +23,7 @@ public final class InputState: ObservableObject {
     
     public var keyboardPresented: Bool { keyboardInset > 0 }
     
-    let scrollToItem = ValuePublisher<UUID>()
+    let scrollToItem = PassthroughSubject<UUID, Never>()
     
     private func animation(from notification: Notification) -> Animation? {
         guard let info = notification.userInfo,
@@ -43,9 +42,11 @@ public final class InputState: ObservableObject {
         }
     }
     
+    private var observer: AnyCancellable?
+    
     fileprivate init() {
-        NotificationCenter.default.publisher(for: UIApplication.keyboardWillChangeFrameNotification)
-            .sinkMain(retained: self) { [weak self] notification in
+        observer = NotificationCenter.default.publisher(for: UIApplication.keyboardWillChangeFrameNotification)
+            .sink(receiveValue: { [weak self] notification in
                 guard let wSelf = self else { return }
                 
                 let keyboardFrame = notification.userInfo?[UIWindow.keyboardFrameEndUserInfoKey] as? CGRect ?? .zero
@@ -61,7 +62,7 @@ public final class InputState: ObservableObject {
                         wSelf.focused = nil
                     }
                 }
-        }
+        })
     }
     
     public func closeKeyboard() {

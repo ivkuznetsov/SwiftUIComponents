@@ -7,8 +7,6 @@
 
 import SwiftUI
 
-import SwiftUI
-
 public extension UIApplication {
     var sceneKeyWindow: UIWindow? {
         connectedScenes.compactMap { $0 as? UIWindowScene }

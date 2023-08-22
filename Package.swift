@@ -13,12 +13,8 @@ let package = Package(
         .library(name: "SwiftUIComponents",
                  targets: ["SwiftUIComponents"]),
     ],
-    dependencies: [
-        .package(url: "https://github.com/ivkuznetsov/CommonUtils.git", from: .init(1, 1, 3)),
-        .package(url: "https://github.com/ivkuznetsov/Coordinators.git", from: .init(1, 0, 0))
-    ],
+    dependencies: [],
     targets: [
-        .target(name: "SwiftUIComponents",
-                dependencies: ["CommonUtils", "Coordinators"])
+        .target(name: "SwiftUIComponents", dependencies: [])
     ]
 )
