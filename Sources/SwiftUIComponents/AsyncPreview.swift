@@ -25,8 +25,10 @@ public struct AsyncPreview<T>: View {
             if let value = value {
                 view(value)
             }
-        }.task {
-            value = await prepare()
+        }.onFirstAppear {
+            Task { @MainActor in
+                value = await prepare()
+            }
         }
     }
 }

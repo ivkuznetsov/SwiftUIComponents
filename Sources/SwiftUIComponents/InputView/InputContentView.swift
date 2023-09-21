@@ -9,54 +9,89 @@ import UIKit
 import SwiftUI
 import Combine
 
-private struct InputFieldModifier<Value: Equatable>: ViewModifier {
+public enum ValidationResult: Equatable {
+    case valid
+    case invalid(String = "")
+}
+
+public final class FieldState: ObservableObject {
     
-    @State var identifier: UUID
-    let inputState: InputState
+    let id: UUID
+    weak var inputState: InputState?
     
-    let validation: (Value)->ValidationResult
-    let errorView: (String)->AnyView
+    @Published var validationResult = ValidationResult.valid
+    @Published var shake = false
+    let focus: FocusState<UUID?>.Binding
+    var validate: (()->ValidationResult)!
+    
+    init(id: UUID, inputState: InputState, validate: @escaping ()->ValidationResult) {
+        self.id = id
+        self.inputState = inputState
+        self.focus = inputState.focused
+        self.validate = { [weak self] in
+            guard let wSelf = self else { return .valid }
+            
+            withAnimation {
+                wSelf.validationResult = validate()
+            }
+            if wSelf.validationResult != .valid {
+                DispatchQueue.main.async {
+                    wSelf.shake.toggle()
+                }
+            }
+            return wSelf.validationResult
+        }
+        
+        inputState.fields[id] = self
+    }
+    
+    func update(frame: CGRect) {
+        inputState?.inputs[id] = frame
+    }
+    
+    func resetValidation() {
+        if validationResult != .valid {
+            withAnimation {
+                validationResult = .valid
+            }
+        }
+    }
+    
+    deinit {
+        inputState?.fields[id] = nil
+    }
+}
+
+private struct InputFieldModifier<Value: Equatable, ErrorView: View>: ViewModifier {
+    
+    @StateObject var state: FieldState
     @Binding var value: Value
-    @State private var shake = false
-    @State private var validationResult = ValidationResult.valid
+    let errorView: (String)->ErrorView
     
-    private func updateFrame(frame: CGRect) -> some View {
-        inputState.inputs[identifier] = frame
+    init(state: @autoclosure @escaping () -> FieldState, errorView: @escaping (String)->ErrorView, value: Binding<Value>) {
+        _state = .init(wrappedValue: state())
+        _value = value
+        self.errorView = errorView
+    }
+    
+    private func update(frame: CGRect) -> some View {
+        state.update(frame: frame)
         return Color.clear
     }
     
     func body(content: Content) -> some View {
         VStack {
             content
-            if case .invalid(let string) = validationResult, string.count > 0 {
-                HStack {
-                    errorView(string)
-                    Spacer()
-                }
+            if case .invalid(let string) = state.validationResult, string.count > 0 {
+                errorView(string)
             }
-        }.shaked(shake)
-            .id(identifier)
-            .focused(inputState.focused, equals: identifier)
+        }.id(state.id)
+            .shaked(state.shake)
+            .focused(state.focus, equals: state.id)
             .background {
-                GeometryReader { updateFrame(frame: $0.frame(in: .named(CoordinateSpace.inputView))) }
-            }.simultaneousGesture(TapGesture().onEnded { _ in
-                inputState.focused.wrappedValue = identifier
-            }, including: inputState.focused.wrappedValue == identifier ? .subviews : .all).onAppear {
-                inputState.validations[identifier] = {
-                    withAnimation {
-                        validationResult = validation(value)
-                    }
-                    if validationResult != .valid {
-                        shake.toggle()
-                    }
-                    return validationResult
-                }
-            }.onChange(of: value) { newValue in
-                if validationResult != .valid {
-                    withAnimation {
-                        validationResult = .valid
-                    }
-                }
+                GeometryReader { update(frame: $0.frame(in: .named(CoordinateSpace.inputView))) }
+            }.onChange(of: value) { _ in
+                state.resetValidation()
             }
     }
 }
@@ -70,9 +105,12 @@ public struct InputErrorView: View {
     }
     
     public var body: some View {
-        Text(title)
-            .padding(.horizontal, 15)
-            .foregroundColor(.red)
+        HStack {
+            Text(title)
+                .padding(.horizontal, 15)
+                .foregroundColor(.red)
+            Spacer()
+        }
     }
 }
 
@@ -82,11 +120,9 @@ public extension View {
                                  id: UUID = UUID(),
                                  errorView: @escaping (String)->AnyView = { InputErrorView(title: $0).asAny },
                                  value: Binding<Value>,
-                                 validation: @escaping (Value)->ValidationResult) -> some View {
-        modifier(InputFieldModifier(identifier: id,
-                                    inputState: inputState,
-                                    validation: validation,
-                                    errorView: { AnyView(errorView($0)) },
+                                 validation: @escaping ()->ValidationResult = { .valid }) -> some View {
+        modifier(InputFieldModifier(state: .init(id: id, inputState: inputState, validate: validation),
+                                    errorView: errorView,
                                     value: value))
     }
     
@@ -94,12 +130,10 @@ public extension View {
                                  id: UUID = UUID(),
                                  errorView: @escaping (String)->AnyView = { InputErrorView(title: $0).asAny },
                                  value: Binding<Value>,
-                                 validation: @escaping (Value)->Bool = { _ in true }) -> some View {
-        input(inputState,
-              id: id,
-              errorView: errorView,
-              value: value,
-              validation: { validation($0) ? .valid : .invalid() })
+                                 validation: @escaping ()->Bool) -> some View {
+        modifier(InputFieldModifier(state: .init(id: id, inputState: inputState, validate: { validation() ? .valid : .invalid() }),
+                                    errorView: errorView,
+                                    value: value))
     }
     
     func input(_ inputState: InputState) -> some View {
@@ -110,31 +144,6 @@ public extension View {
 private extension CoordinateSpace {
     
     static let inputView = "inputView"
-}
-
-private struct InputGesturesModifer: ViewModifier {
-    
-    @ObservedObject var state: InputState
-    
-    func body(content: Content) -> some View {
-        if #available(iOS 16, *) {
-            content
-                .coordinateSpace(name: CoordinateSpace.inputView)
-                .gesture(SpatialTapGesture(coordinateSpace: .named(CoordinateSpace.inputView)).onEnded { value in
-                
-                if let window = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first,
-                   let view = window.hitTest(value.location, with: nil),
-                   view as? UITextInput == nil,
-                   state.inputs.values.first(where: { $0.contains(value.location) }) == nil {
-                    state.closeKeyboard()
-                }
-            }, including: state.keyboardPresented ? .all : .subviews)
-        } else {
-            content.gesture(TapGesture().onEnded { _ in
-                state.closeKeyboard()
-            }, including: state.keyboardPresented ? .all : .subviews)
-        }
-    }
 }
 
 public struct InputContentView<Content: View>: View {
@@ -153,10 +162,14 @@ public struct InputContentView<Content: View>: View {
         return content(state)
     }
     
+    private func updateCloseArea(_ proxy: GeometryProxy) -> some View {
+        state.closeGesture.touchCloseArea = proxy.frame(in: .global)
+        return Color.clear
+    }
+    
     public var body: some View {
         ScrollViewReader { proxy in
             contentView
-                .modifier(InputGesturesModifer(state: state))
                 .onReceive(state.scrollToItem.debounce(for: 0.5, scheduler: DispatchQueue.main)) { item in
                     withAnimation {
                         proxy.scrollTo(item)
@@ -166,6 +179,8 @@ public struct InputContentView<Content: View>: View {
                 }.onDisappear {
                     state.isVisisble = false
                 }
-        }
+        }.background(content: {
+            GeometryReader { updateCloseArea($0) }
+        }).allowsHitTesting(!state.disableTouch)
     }
 }
