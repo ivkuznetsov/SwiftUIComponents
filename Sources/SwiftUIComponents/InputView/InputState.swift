@@ -75,20 +75,22 @@ public final class InputState: ObservableObject {
                 
                 let keyboardFrame = notification.userInfo?[UIWindow.keyboardFrameEndUserInfoKey] as? CGRect ?? .zero
                 
-                withAnimation(wSelf.animation(from: notification)) {
-                    if keyboardFrame.minY + keyboardFrame.height <= UIScreen.main.bounds.height {
-                        let inset = UIScreen.main.bounds.height - keyboardFrame.minY
-                        
-                        if inset != wSelf.keyboardInset {
-                            wSelf.keyboardInset = inset
+                DispatchQueue.main.async {
+                    withAnimation(wSelf.animation(from: notification)) {
+                        if keyboardFrame.minY + keyboardFrame.height <= UIScreen.main.bounds.height {
+                            let inset = UIScreen.main.bounds.height - keyboardFrame.minY
                             
-                            if let focused = wSelf.focused.wrappedValue {
-                                wSelf.scrollToItem.send(focused)
+                            if inset != wSelf.keyboardInset {
+                                wSelf.keyboardInset = inset
+                                
+                                if let focused = wSelf.focused.wrappedValue {
+                                    wSelf.scrollToItem.send(focused)
+                                }
                             }
-                        }
-                    } else {
-                        if wSelf.keyboardInset != 0 {
-                            wSelf.keyboardInset = 0
+                        } else {
+                            if wSelf.keyboardInset != 0 {
+                                wSelf.keyboardInset = 0
+                            }
                         }
                     }
                 }

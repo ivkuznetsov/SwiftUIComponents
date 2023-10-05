@@ -118,4 +118,15 @@ public extension PlatformView {
             }
         }
     }
+    
+    func searchViewController() -> UIViewController? {
+        var responder = next
+        var vc: UIViewController?
+        
+        while vc == nil && responder != nil {
+            vc = responder as? UIViewController
+            responder = responder?.next
+        }
+        return vc
+    }
 }

@@ -181,9 +181,7 @@ public final class PreviewScrollView: UIScrollView, UIScrollViewDelegate {
         }
     }
     
-    public func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return imageView
-    }
+    public func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
     
     public func scrollViewDidZoom(_ scrollView: UIScrollView) {
         var top: CGFloat = 0
