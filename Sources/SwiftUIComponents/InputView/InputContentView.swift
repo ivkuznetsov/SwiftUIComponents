@@ -14,6 +14,12 @@ public enum ValidationResult: Equatable {
     case invalid(String = "")
 }
 
+struct WeakWrapper<T: AnyObject> {
+    weak var object: T?
+    
+    func callAsFunction() -> T? { object }
+}
+
 public final class FieldState: ObservableObject {
     
     let id: UUID
@@ -42,7 +48,7 @@ public final class FieldState: ObservableObject {
             return wSelf.validationResult
         }
         
-        inputState.fields[id] = self
+        inputState.fields[id] = WeakWrapper(object: self)
     }
     
     func update(frame: CGRect) {
@@ -116,12 +122,18 @@ public struct InputErrorView: View {
 
 public extension View {
     
+    func input(_ inputState: InputState,
+               id: UUID = UUID(),
+               errorView: @escaping (String)->AnyView = { InputErrorView(title: $0).asAny }) -> some View {
+        input<Bool>(inputState, id: id, errorView: errorView, value: .init(get: { true }, set: { _ in }), validation: { _ in true })
+    }
+    
     func input<Value: Equatable>(_ inputState: InputState,
                                  id: UUID = UUID(),
                                  errorView: @escaping (String)->AnyView = { InputErrorView(title: $0).asAny },
                                  value: Binding<Value>,
-                                 validation: @escaping ()->ValidationResult = { .valid }) -> some View {
-        modifier(InputFieldModifier(state: .init(id: id, inputState: inputState, validate: validation),
+                                 validation: @escaping (Value)->ValidationResult = { _ in .valid }) -> some View {
+        modifier(InputFieldModifier(state: .init(id: id, inputState: inputState, validate: { validation(value.wrappedValue) }),
                                     errorView: errorView,
                                     value: value))
     }
@@ -130,8 +142,8 @@ public extension View {
                                  id: UUID = UUID(),
                                  errorView: @escaping (String)->AnyView = { InputErrorView(title: $0).asAny },
                                  value: Binding<Value>,
-                                 validation: @escaping ()->Bool) -> some View {
-        modifier(InputFieldModifier(state: .init(id: id, inputState: inputState, validate: { validation() ? .valid : .invalid() }),
+                                 validation: @escaping (Value)->Bool) -> some View {
+        modifier(InputFieldModifier(state: .init(id: id, inputState: inputState, validate: { validation(value.wrappedValue) ? .valid : .invalid() }),
                                     errorView: errorView,
                                     value: value))
     }

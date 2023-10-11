@@ -23,7 +23,7 @@ public final class InputState: ObservableObject {
     @Published var disableTouch = false
     
     var inputs: [UUID:CGRect] = [:]
-    var fields: [UUID:FieldState] = [:]
+    var fields: [UUID:WeakWrapper<FieldState>] = [:]
     
     var focused: FocusState<UUID?>.Binding!
     var isVisisble: Bool = false {
@@ -99,8 +99,8 @@ public final class InputState: ObservableObject {
     
     public func showError(_ id: UUID, error: String) {
         withAnimation {
-            fields[id]?.validationResult = .invalid(error)
-            fields[id]?.shake.toggle()
+            fields[id]?()?.validationResult = .invalid(error)
+            fields[id]?()?.shake.toggle()
         }
     }
     
@@ -162,7 +162,7 @@ public final class InputState: ObservableObject {
     public func validate() -> Bool {
         var result = true
         fields.values.forEach {
-            if $0.validate() != .valid {
+            if $0()?.validate() != .valid {
                 result = false
             }
         }
