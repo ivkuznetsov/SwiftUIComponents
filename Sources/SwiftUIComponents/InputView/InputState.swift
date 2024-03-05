@@ -42,7 +42,7 @@ public final class InputState: ObservableObject {
     
     public var keyboardPresented: Bool { keyboardInset > 0 }
     
-    let scrollToItem = PassthroughSubject<UUID, Never>()
+    public let scrollToItem = PassthroughSubject<UUID, Never>()
     let closeGesture = CloseKeyboardGestureRecognizer()
     
     private func animation(from notification: Notification) -> Animation? {
