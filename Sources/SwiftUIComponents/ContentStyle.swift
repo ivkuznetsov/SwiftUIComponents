@@ -85,7 +85,7 @@ public struct MaxControlWidthModifier: ViewModifier {
     @EnvironmentObject var contentStyle: ContentStyle
     
     public func body(content: Content) -> some View {
-        content.frame(maxWidth: contentStyle.maxContentWidth)
+        content.frame(maxWidth: contentStyle.maxControlWidth)
     }
 }
 

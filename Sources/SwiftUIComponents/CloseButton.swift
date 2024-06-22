@@ -12,8 +12,8 @@ public struct CloseButton: View {
     
     let icon: String
     let title: String
-    var iconColor: Color = .clear
-    var background: Color = .clear
+    var iconColor: Color?
+    var background: Color?
     let action: (()->())?
     
     public init(icon: String = "xmark",
@@ -24,8 +24,8 @@ public struct CloseButton: View {
         self.icon = icon
         self.title = title
         self.action = action
-        self.iconColor = iconColor ?? contentStyle.labelColor
-        self.background = background ?? contentStyle.controlColor
+        self.iconColor = iconColor
+        self.background = background
     }
     
     var button: some View {
@@ -46,9 +46,9 @@ public struct CloseButton: View {
     public var body: some View {
         button
             .font(.system(size: 15, weight: .medium, design: .rounded))
-            .foregroundColor(iconColor)
+            .foregroundColor(iconColor ?? contentStyle.labelColor)
             .frame(width: 33, height: 33)
-            .background(background)
+            .background(background ?? contentStyle.controlColor)
             .buttonStyle(PlainButtonStyle())
             .clipShape(Circle())
             .padding(.horizontal, 3)
