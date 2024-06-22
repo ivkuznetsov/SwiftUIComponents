@@ -151,9 +151,8 @@ public final class PreviewScrollView: UIScrollView, UIScrollViewDelegate {
             minimumZoomScale = bounds.size.height / (imageView.frame.size.width / aspect / zoomScale)
         }
         
-        if maximumZoomScale < minimumZoomScale {
-            maximumZoomScale = minimumZoomScale
-        }
+        maximumZoomScale = minimumZoomScale * 4
+        
         if zoomScale < minimumZoomScale {
             zoomScale = minimumZoomScale
         }

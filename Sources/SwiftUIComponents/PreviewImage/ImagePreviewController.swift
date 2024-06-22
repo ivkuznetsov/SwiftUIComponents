@@ -56,6 +56,7 @@ public struct ExpandablePreviewImage: UIViewRepresentable {
     }
     
     public func updateUIView(_ uiView: UIView, context: Context) { 
+        setup(uiView as! ExpandButton)
         (uiView as! ExpandButton).fullImageProvider = provider
     }
 }
