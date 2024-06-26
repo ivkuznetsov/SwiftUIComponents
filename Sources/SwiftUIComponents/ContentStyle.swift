@@ -16,12 +16,29 @@ public struct Chevron: View {
     public init() {}
 }
 
-open class ContentStyle: ObservableObject {
+public final class ContentStyle: ObservableObject {
     
-    @Published public var labelColor: Color
-    @Published public var invertedLabelColor: Color
-    @Published public var controlColor: Color
-    @Published public var accentTint: Color
+    @Published public var content: [String:Any] = [:]
+    
+    public var labelColor: Color {
+        set { content["label"] = newValue }
+        get { content["label"] as? Color ?? Color(.label) }
+    }
+    
+    public var invertedLabelColor: Color {
+        set { content["invertedLabel"] = newValue }
+        get { content["invertedLabel"] as? Color ?? Color(.systemBackground) }
+    }
+    
+    public var controlColor: Color {
+        set { content["control"] = newValue }
+        get { content["control"] as? Color ?? Color(.secondarySystemBackground) }
+    }
+    
+    public var accentTint: Color {
+        set { content["accent"] = newValue }
+        get { content["accent"] as? Color ?? Color(.systemBlue) }
+    }
     
     @Published public var fonts: FontsProvider
     @Published public var maxControlWidth: CGFloat
@@ -59,13 +76,13 @@ open class ContentStyle: ObservableObject {
          fonts: FontsProvider = .init(),
          maxControlWidth: CGFloat = 330,
          maxContentWidth: CGFloat = 600) {
+        self.fonts = fonts
+        self.maxControlWidth = maxControlWidth
+        self.maxContentWidth = maxContentWidth
         self.labelColor = labelColor
         self.invertedLabelColor = invertedLabelColor
         self.controlColor = controlColor
         self.accentTint = accentTint
-        self.fonts = fonts
-        self.maxControlWidth = maxControlWidth
-        self.maxContentWidth = maxContentWidth
     }
 }
 
