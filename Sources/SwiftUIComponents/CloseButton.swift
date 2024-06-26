@@ -57,18 +57,22 @@ public struct CloseButton: View {
 
 public extension View {
     
-    func withCloseButton(action: (()->())? = nil) -> some View {
+    func withCloseButton(action: (()->())? = nil, hidden: Bool = false) -> some View {
         toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                CloseButton(action: action)
+                if !hidden {
+                    CloseButton(action: action)
+                }
             }
         }
     }
     
-    func withBackButton(action: (()->())? = nil) -> some View {
+    func withBackButton(action: (()->())? = nil, hidden: Bool = false) -> some View {
         toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                CloseButton(icon: "chevron.left", action: action)
+                if !hidden {
+                    CloseButton(icon: "chevron.left", action: action)
+                }
             }
         }.navigationBarBackButtonHidden()
     }
