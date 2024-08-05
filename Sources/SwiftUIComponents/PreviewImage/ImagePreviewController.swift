@@ -9,7 +9,7 @@ public struct ExpandablePreviewImage: UIViewRepresentable {
     
     final class ExpandButton: UIButton {
         
-        var fullImageProvider: FullImageProvider?
+        var fullImageProvider: ImageProvider?
         
         init() {
             super.init(frame: .zero)
@@ -28,11 +28,10 @@ public struct ExpandablePreviewImage: UIViewRepresentable {
         @objc private func selectAction() {
             if let vc = searchViewController(),
                 let image = image(for: .normal) {
-                vc.present(ImagePreviewController(image: image,
-                                                  fullImageProvider: fullImageProvider,
-                                                  sourceView: self,
-                                                  contentMode: .scaleAspectFill),
-                           animated: true)
+                let imageVC = ImagePreviewController(image: image, fullImageProvider: fullImageProvider)
+                imageVC.animation = ExpandAnimation(source: self, dismissingSource: { [weak imageVC] in imageVC?.scrollView.imageView }, contentMode: contentMode)
+                imageVC.animation?.viewController = imageVC
+                vc.present(imageVC, animated: true)
             }
         }
         
@@ -41,10 +40,10 @@ public struct ExpandablePreviewImage: UIViewRepresentable {
         }
     }
     
-    private let provider: FullImageProvider?
+    private let provider: ImageProvider?
     private let setup: ((UIButton)->())
     
-    public init(provider: FullImageProvider? = nil, setup: @escaping (UIButton) -> Void) {
+    public init(provider: ImageProvider? = nil, setup: @escaping (UIButton) -> Void) {
         self.provider = provider
         self.setup = setup
     }
@@ -61,7 +60,7 @@ public struct ExpandablePreviewImage: UIViewRepresentable {
     }
 }
 
-public enum FullImageProvider {
+public enum ImageProvider {
     case image(UIImage)
     case url(URL)
     case loader(() async throws ->UIImage)
@@ -69,17 +68,16 @@ public enum FullImageProvider {
 
 open class ImagePreviewController: UIViewController {
     
-    private let image: UIImage
-    private let fullImageProvider: FullImageProvider?
-    private let scrollView = PreviewScrollView()
+    private var image: UIImage?
+    private let fullImageProvider: ImageProvider?
+    public let scrollView = PreviewScrollView()
     
     private var downloadTask: Task<Void, Error>?
-    let animation: ExpandAnimation
+    public var animation: ExpandAnimation?
     
-    public init(image: UIImage, fullImageProvider: FullImageProvider? = nil, sourceView: UIView, contentMode: UIView.ContentMode) {
+    public init(image: UIImage? = nil, fullImageProvider: ImageProvider? = nil) {
         self.image = image
         self.fullImageProvider = fullImageProvider
-        animation = ExpandAnimation(source: sourceView, dismissingSource: scrollView.imageView, contentMode: contentMode)
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .fullScreen
     }
@@ -102,24 +100,26 @@ open class ImagePreviewController: UIViewController {
         scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor).isActive = true
         scrollView.set(image: image)
         
-        animation.viewController = self
-        self.transitioningDelegate = animation
-        
         scrollView.didZoom = { [weak self] (zoom) in
             if let wSelf = self {
-                wSelf.animation.interactionDismissing = zoom <= wSelf.scrollView.minimumZoomScale
+                wSelf.animation?.interactionDismissing = zoom <= wSelf.scrollView.minimumZoomScale
             }
         }
         scrollView.didZoom?(scrollView.zoomScale)
         
         let completion: (UIImage?)->() = { [weak self] image in
-            guard let image = image else { return }
+            guard let wSelf = self, let image = image else { return }
             
             Task { @MainActor in
-                self?.scrollView.imageView.image = image
+                if wSelf.image == nil {
+                    wSelf.scrollView.set(image: image)
+                } else {
+                    wSelf.scrollView.imageView.image = image
+                    
+                }
                 let transition = CATransition()
                 transition.duration = 0.15
-                self?.scrollView.imageView.layer.add(transition, forKey: nil)
+                wSelf.scrollView.imageView.layer.add(transition, forKey: nil)
             }
         }
         

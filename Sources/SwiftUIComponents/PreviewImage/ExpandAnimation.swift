@@ -4,11 +4,18 @@
 
 import UIKit
 
-class ExpandAnimation: NSObject {
+public class ExpandAnimation: NSObject {
     
     fileprivate let source: UIView
-    fileprivate let dismissingSource: UIImageView
-    weak var viewController: UIViewController?
+    fileprivate let dismissingSource: ()->UIImageView?
+    
+    public weak var viewController: UIViewController? {
+        didSet {
+            viewController?.transitioningDelegate = self
+            reloadGestures()
+        }
+    }
+    
     fileprivate var yTranslation: CGFloat = 0
     fileprivate var reversed: Bool = false
     fileprivate var location = CGPoint.zero
@@ -16,19 +23,7 @@ class ExpandAnimation: NSObject {
     fileprivate var shouldEndGesture = false
     
     var interactionDismissing: Bool = false {
-        didSet {
-            if interactionDismissing {
-                dismissingSource.superview?.superview?.addGestureRecognizer(panGR)
-                dismissingSource.superview?.superview?.addGestureRecognizer(pinchGR)
-                panGR.isEnabled = true
-                pinchGR.isEnabled = true
-            } else {
-                panGR.isEnabled = false
-                pinchGR.isEnabled = false
-            }
-            dismissingSource.superview?.superview?.addGestureRecognizer(tapGR)
-            tapGR.isEnabled = true
-        }
+        didSet { reloadGestures() }
     }
     
     fileprivate let imageView: UIImageView = {
@@ -59,10 +54,11 @@ class ExpandAnimation: NSObject {
     fileprivate let contentMode: UIView.ContentMode
     var presenting: Bool = false
     
-    init(source: UIView, dismissingSource: UIImageView, contentMode: UIView.ContentMode) {
+    public init(source: UIView, dismissingSource: @escaping ()->UIImageView?, contentMode: UIView.ContentMode) {
         self.source = source
         self.dismissingSource = dismissingSource
         self.contentMode = contentMode
+        
         super.init()
         
         pinchGR.delegate = self
@@ -75,16 +71,33 @@ class ExpandAnimation: NSObject {
         secondImageView.contentMode = contentMode
     }
     
+    private func reloadGestures() {
+        guard let gesturesView = viewController?.view else { return }
+        
+        if interactionDismissing {
+            gesturesView.addGestureRecognizer(panGR)
+            gesturesView.addGestureRecognizer(pinchGR)
+            panGR.isEnabled = true
+            pinchGR.isEnabled = true
+        } else {
+            panGR.isEnabled = false
+            pinchGR.isEnabled = false
+        }
+        gesturesView.addGestureRecognizer(tapGR)
+        tapGR.isEnabled = true
+    }
+    
     @objc func panAction(_ gr: UIPanGestureRecognizer) {
-        let translation = gr.translation(in: dismissingSource.superview?.superview)
+        guard let gesturesView = viewController?.view else { return }
+        
+        let translation = gr.translation(in: gesturesView)
         
         if gr.state == .began {
             viewController?.dismiss(animated: true, completion: nil)
             yTranslation = translation.y
         }
         if gr.state == .changed {
-            
-            let value = min(1, (1 - (translation.y / dismissingSource.superview!.superview!.frame.size.height) / 2))
+            let value = min(1, (1 - (translation.y / gesturesView.frame.size.height) / 2))
             let scale = max(value, 0.7)
             
             var convertedTranslation = translation
@@ -106,9 +119,11 @@ class ExpandAnimation: NSObject {
     }
     
     @objc func pinchAction(_ gr: UIPinchGestureRecognizer) {
+        guard let gesturesView = viewController?.view else { return }
+        
         if gr.state == .began {
             viewController?.dismiss(animated: true, completion: nil)
-            location = gr.location(in: dismissingSource.superview?.superview)
+            location = gr.location(in: gesturesView)
         }
         if gr.state == .changed {
             if gr.numberOfTouches < 2 {
@@ -117,7 +132,7 @@ class ExpandAnimation: NSObject {
                 return
             }
             let scale = pinchGR.scale
-            let location = gr.location(in: dismissingSource.superview?.superview)
+            let location = gr.location(in: gesturesView)
             let translation = CGPoint(x: location.x - self.location.x, y: location.y - self.location.y)
             
             imageView.transform = CGAffineTransform(scaleX: scale, y: scale).concatenating(CGAffineTransform(translationX: translation.x, y: translation.y))
@@ -160,8 +175,9 @@ class ExpandAnimation: NSObject {
                            options: .curveEaseOut,
                            animations: {
                             
-                            self.overlayView.alpha = 1
-                            self.imageView.frame = self.dismissingSource.convert(self.dismissingSource.bounds, to: containerView)
+                self.overlayView.alpha = 1
+                guard let dismissingView = self.dismissingSource() else { return }
+                self.imageView.frame = dismissingView.convert(dismissingView.bounds, to: containerView)
             }, completion: { (_) in
                 
                 self.source.isHidden = false
@@ -181,42 +197,44 @@ class ExpandAnimation: NSObject {
 
 extension ExpandAnimation: UIViewControllerTransitioningDelegate {
     
-    func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+    public func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
         self.presenting = true
         return self
     }
     
-    func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+    public func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
         self.presenting = false
         return self
     }
     
-    func interactionControllerForDismissal(using animator: UIViewControllerAnimatedTransitioning) -> UIViewControllerInteractiveTransitioning? {
+    public func interactionControllerForDismissal(using animator: UIViewControllerAnimatedTransitioning) -> UIViewControllerInteractiveTransitioning? {
         return interactionDismissing ? self : nil
     }
 }
 
 extension ExpandAnimation: UIViewControllerInteractiveTransitioning {
     
-    func startInteractiveTransition(_ transitionContext: UIViewControllerContextTransitioning) {
+    public func startInteractiveTransition(_ transitionContext: UIViewControllerContextTransitioning) {
         interativeContext = transitionContext
         
-        let fromVC = transitionContext.viewController(forKey: .from)!
-        let toVC = transitionContext.viewController(forKey: .to)!
-        let containerView = transitionContext.containerView
-        let finalFrane = transitionContext.finalFrame(for: toVC)
-        
-        toVC.view.frame = finalFrane
-        containerView.addSubview(toVC.view)
-        
-        overlayView.frame = fromVC.view.bounds
-        overlayView.alpha = 1
-        containerView.addSubview(overlayView)
-        
-        imageView.image = dismissingSource.image
-        imageView.frame = dismissingSource.convert(dismissingSource.bounds, to: containerView)
-        source.isHidden = true
-        containerView.addSubview(imageView)
+        if let dismissingView = dismissingSource() {
+            let fromVC = transitionContext.viewController(forKey: .from)!
+            let toVC = transitionContext.viewController(forKey: .to)!
+            let containerView = transitionContext.containerView
+            let finalFrane = transitionContext.finalFrame(for: toVC)
+            
+            toVC.view.frame = finalFrane
+            containerView.addSubview(toVC.view)
+            
+            overlayView.frame = fromVC.view.bounds
+            overlayView.alpha = 1
+            containerView.addSubview(overlayView)
+            
+            imageView.image = dismissingView.image
+            imageView.frame = dismissingView.convert(dismissingView.bounds, to: containerView)
+            source.isHidden = true
+            containerView.addSubview(imageView)
+        }
         
         if shouldEndGesture {
             shouldEndGesture = false
@@ -260,11 +278,9 @@ extension UIView {
 
 extension ExpandAnimation: UIViewControllerAnimatedTransitioning {
     
-    func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
-        return 0.45
-    }
+    public func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval { 0.45 }
     
-    func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
+    public func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
         
         let fromVC = transitionContext.viewController(forKey: .from)!
         let toVC = transitionContext.viewController(forKey: .to)!
@@ -282,7 +298,11 @@ extension ExpandAnimation: UIViewControllerAnimatedTransitioning {
             
             let oldColor = toVC.view.subviews.first?.backgroundColor
             toVC.view.subviews.first?.backgroundColor = UIColor.clear
-            imageView.image = dismissingSource.image
+            
+            if let dismissingView = dismissingSource() {
+                imageView.image = dismissingView.image
+            }
+            
             toVC.view.subviews.first?.backgroundColor = oldColor
             imageView.frame = source.convert(source.bounds, to: containerView)
             containerView.addSubview(imageView)
@@ -326,8 +346,10 @@ extension ExpandAnimation: UIViewControllerAnimatedTransitioning {
             overlayView.alpha = 1
             containerView.addSubview(overlayView)
             
-            imageView.image = dismissingSource.image
-            imageView.frame = dismissingSource.convert(dismissingSource.bounds, to: containerView)
+            if let dismissingView = dismissingSource() {
+                imageView.image = dismissingView.image
+                imageView.frame = dismissingView.convert(dismissingView.bounds, to: containerView)
+            }
             containerView.addSubview(imageView)
             
             dismissController(context: transitionContext)

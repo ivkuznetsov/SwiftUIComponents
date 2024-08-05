@@ -25,7 +25,7 @@ public struct PreviewImage: UIViewRepresentable {
 public final class PreviewScrollView: UIScrollView, UIScrollViewDelegate {
     
     public var aspectFill: Bool = false
-    let imageView: UIImageView = {
+    public let imageView: UIImageView = {
         let imageView = UIImageView()
         imageView.backgroundColor = .clear
         imageView.layer.allowsEdgeAntialiasing = true
