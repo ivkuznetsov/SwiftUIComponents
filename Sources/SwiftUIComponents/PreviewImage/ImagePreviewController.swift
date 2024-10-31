@@ -20,8 +20,8 @@ public struct ExpandablePreviewImage: UIViewRepresentable {
             setContentCompressionResistancePriority(.init(1), for: .horizontal)
         }
         
-        override func setImage(_ image: UIImage?, for state: UIControl.State) {
-            super.setImage(image, for: state)
+        override func layoutSubviews() {
+            super.layoutSubviews()
             imageView?.frame = self.bounds
         }
         
@@ -29,7 +29,7 @@ public struct ExpandablePreviewImage: UIViewRepresentable {
             if let vc = searchViewController(),
                 let image = image(for: .normal) {
                 let imageVC = ImagePreviewController(image: image, fullImageProvider: fullImageProvider)
-                imageVC.animation = ExpandAnimation(source: self, dismissingSource: { [weak imageVC] in imageVC?.scrollView.imageView }, contentMode: contentMode)
+                imageVC.animation = ExpandAnimation(source: self, dismissingSource: { [weak imageVC] in imageVC?.scrollView.imageView }, contentMode: imageView?.contentMode ?? .scaleAspectFill)
                 imageVC.animation?.viewController = imageVC
                 vc.present(imageVC, animated: true)
             }
