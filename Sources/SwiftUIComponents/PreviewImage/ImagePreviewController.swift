@@ -26,12 +26,13 @@ public struct ExpandablePreviewImage: UIViewRepresentable {
         }
         
         @objc private func selectAction() {
-            if let vc = searchViewController(),
+            if let vc = UIApplication.topViewController,
                 let image = image(for: .normal) {
                 let imageVC = ImagePreviewController(image: image, fullImageProvider: fullImageProvider)
                 imageVC.animation = ExpandAnimation(source: self, dismissingSource: { [weak imageVC] in imageVC?.scrollView.imageView }, contentMode: imageView?.contentMode ?? .scaleAspectFill)
                 imageVC.animation?.viewController = imageVC
                 vc.present(imageVC, animated: true)
+                vc.modalPresentationStyle = .pageSheet
             }
         }
         
