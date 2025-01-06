@@ -4,6 +4,7 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 public struct Chevron: View {
     
@@ -16,6 +17,7 @@ public struct Chevron: View {
     public init() {}
 }
 
+@MainActor
 public final class ContentStyle: ObservableObject {
     
     @Published public var content: [String:Any] = [:]
@@ -69,6 +71,8 @@ public final class ContentStyle: ObservableObject {
         }
     }
     
+    private var dynamicTypeObserver: AnyCancellable?
+    
     public init(labelColor: Color = Color(.label),
          invertedLabelColor: Color = Color(.systemBackground),
          controlColor: Color = .black,
@@ -83,6 +87,10 @@ public final class ContentStyle: ObservableObject {
         self.invertedLabelColor = invertedLabelColor
         self.controlColor = controlColor
         self.accentTint = accentTint
+        
+        dynamicTypeObserver = NotificationCenter.default.publisher(for: UIContentSizeCategory.didChangeNotification).sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 }
 
