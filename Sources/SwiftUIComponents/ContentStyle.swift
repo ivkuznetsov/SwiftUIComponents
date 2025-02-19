@@ -61,11 +61,13 @@ public final class ContentStyle: ObservableObject {
     }
     
     public struct FontsProvider {
+        public let supportAccessibility: Bool
         public let font: (FontSize)->Font
         public let uiFont: (FontSize, UIFont.Weight)->UIFont
         
-        public init(font: @escaping (FontSize) -> Font = { .system(size: $0.rawValue) },
+        public init(supportAccessibility: Bool = false, font: @escaping (FontSize) -> Font = { .system(size: $0.rawValue) },
              uiFont: @escaping (FontSize, UIFont.Weight) -> UIFont =  { .systemFont(ofSize: $0.rawValue, weight: $1) }) {
+            self.supportAccessibility = supportAccessibility
             self.font = font
             self.uiFont = uiFont
         }
@@ -98,10 +100,16 @@ struct AppFontModifier: ViewModifier {
     
     @EnvironmentObject var contentStyle: ContentStyle
     
-    let size: ContentStyle.FontSize
+    private let size: ContentStyle.FontSize
+    @ScaledMetric private var scaledSize: CGFloat
+    
+    init(size: ContentStyle.FontSize) {
+        self.size = size
+        _scaledSize = .init(wrappedValue: size.rawValue)
+    }
     
     public func body(content: Content) -> some View {
-        content.font(contentStyle.fonts.font(size))
+        content.font(contentStyle.fonts.font(contentStyle.fonts.supportAccessibility ? .init(rawValue: scaledSize) : size))
     }
 }
 
