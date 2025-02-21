@@ -53,11 +53,20 @@ public final class ContentStyle: ObservableObject {
             self.rawValue = rawValue
         }
         
-        public static let huge = FontSize(rawValue: 26)
-        public static let big = FontSize(rawValue: 20)
-        public static let header = FontSize(rawValue: 16)
-        public static let normal = FontSize(rawValue: 14)
-        public static let small = FontSize(rawValue: 12)
+        @MainActor
+        public static var huge = FontSize(rawValue: 26)
+        
+        @MainActor
+        public static var big = FontSize(rawValue: 20)
+        
+        @MainActor
+        public static var header = FontSize(rawValue: 16)
+        
+        @MainActor
+        public static var normal = FontSize(rawValue: 14)
+        
+        @MainActor
+        public static var small = FontSize(rawValue: 12)
     }
     
     public struct FontsProvider {
@@ -133,8 +142,9 @@ public struct MaxContentWidthModifier: ViewModifier {
 
 public extension View {
     
-    func appFont(size: ContentStyle.FontSize = .normal) -> some View {
-        modifier(AppFontModifier(size: size))
+    @MainActor
+    func appFont(size: ContentStyle.FontSize? = nil) -> some View {
+        modifier(AppFontModifier(size: size ?? .normal))
     }
     
     func maxControlWidth() -> some View {
