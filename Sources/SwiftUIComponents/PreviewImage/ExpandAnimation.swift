@@ -221,10 +221,14 @@ extension ExpandAnimation: UIViewControllerInteractiveTransitioning {
             let fromVC = transitionContext.viewController(forKey: .from)!
             let toVC = transitionContext.viewController(forKey: .to)!
             let containerView = transitionContext.containerView
-            let finalFrane = transitionContext.finalFrame(for: toVC)
+            let finalFrame = transitionContext.finalFrame(for: toVC)
             
-            toVC.view.frame = finalFrane
-            containerView.addSubview(toVC.view)
+            if toVC.modalPresentationStyle == .fullScreen || toVC.presentingViewController == nil {
+                toVC.view.frame = finalFrame
+                containerView.addSubview(toVC.view)
+            } else {
+                fromVC.view.isHidden = true
+            }
             
             overlayView.frame = fromVC.view.bounds
             overlayView.alpha = 1
@@ -339,8 +343,13 @@ extension ExpandAnimation: UIViewControllerAnimatedTransitioning {
             }, completion: nil)
             
         } else {
-            toVC.view.frame = finalFrame
-            containerView.addSubview(toVC.view)
+            
+            if toVC.modalPresentationStyle == .fullScreen || toVC.presentingViewController == nil {
+                toVC.view.frame = finalFrame
+                containerView.addSubview(toVC.view)
+            } else {
+                fromVC.view.isHidden = true
+            }
             
             overlayView.frame = fromVC.view.bounds
             overlayView.alpha = 1
@@ -357,10 +366,11 @@ extension ExpandAnimation: UIViewControllerAnimatedTransitioning {
     }
     
     func dismissController(context: UIViewControllerContextTransitioning) {
-        let fromVC = context.viewController(forKey: .from)!
-        fromVC.view.removeFromSuperview()
-        let containerView = context.containerView
         context.finishInteractiveTransition()
+        
+        let fromVC = context.viewController(forKey: .from)!
+        fromVC.view.isHidden = true
+        let containerView = context.containerView
         
         let frame = imageView.frame
         imageView.transform = .identity
