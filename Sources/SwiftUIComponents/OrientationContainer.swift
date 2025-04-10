@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-public struct OrientationAttributes {
+public struct OrientationAttributes: Equatable {
     
     public enum Orientation {
         case portrait
@@ -16,38 +16,62 @@ public struct OrientationAttributes {
     }
     public let orientation: Orientation
     public let isiPad: Bool
+    
+    static func makeDefault() -> OrientationAttributes {
+        let screen = UIScreen.main
+        return .init(orientation: screen.bounds.width > screen.bounds.height ? .landscape : .portrait,
+                     isiPad: screen.traitCollection.horizontalSizeClass == .regular &&
+                             screen.traitCollection.verticalSizeClass == .regular)
+    }
 }
 
 public struct OrientationContainer<V: View>: View {
     
+    private struct ViewSize: PreferenceKey {
+        static var defaultValue: CGSize { .init(width: 0, height: 0) }
+
+        static func reduce(value: inout CGSize, nextValue: () -> CGSize) { }
+    }
+    
     @Environment(\.horizontalSizeClass) private var hSize
     @Environment(\.verticalSizeClass) private var vSize
     
-    @ViewBuilder let content: (OrientationAttributes)->V
+    @State var currentAttributes: OrientationAttributes
+    
+    let content: (OrientationAttributes)->V
     private let didChange: ((OrientationAttributes)->())?
 
     public init(@ViewBuilder content: @escaping (OrientationAttributes)->V,
                 didChange: ((OrientationAttributes)->())? = nil) {
+        _currentAttributes = .init(initialValue: .makeDefault())
         self.content = content
         self.didChange = didChange
     }
     
-    private func orientation(hSize: UserInterfaceSizeClass?, vSize: UserInterfaceSizeClass?) -> OrientationAttributes {
-        let isiPad = hSize == .regular && vSize == .regular
-        
-        if hSize == .regular || (vSize == .compact && hSize == .compact) {
-            return .init(orientation: .landscape, isiPad: isiPad)
-        } else{
-            return .init(orientation: .portrait, isiPad: isiPad)
-        }
+    private func makeAttributes() -> OrientationAttributes {
+        let bounds = UIScreen.main.bounds
+        return OrientationAttributes(orientation: bounds.width > bounds.height ? .landscape : .portrait,
+                                     isiPad: hSize == .regular && vSize == .regular)
     }
     
     public var body: some View {
-        content(orientation(hSize: hSize, vSize: vSize))
-            .onChange(of: hSize ?? .compact) {
-                didChange?(orientation(hSize: $0, vSize: vSize))
-            }.onChange(of: vSize ?? .compact) {
-                didChange?(orientation(hSize: hSize, vSize: $0))
+        return content(currentAttributes)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(key: ViewSize.self, value: proxy.size)
+                        .onPreferenceChange(ViewSize.self) { attr in
+                            Task { @MainActor in
+                                let attr = makeAttributes()
+                                
+                                if currentAttributes != attr {
+                                    currentAttributes = attr
+                                }
+                            }
+                        }
+                }
+            }
+            .onChange(of: currentAttributes) {
+                didChange?($0)
             }
     }
 }
