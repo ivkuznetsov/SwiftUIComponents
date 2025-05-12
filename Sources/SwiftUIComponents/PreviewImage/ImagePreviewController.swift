@@ -4,6 +4,7 @@
 
 import UIKit
 import SwiftUI
+import CommonUtils
 
 public struct ExpandablePreviewImage: UIViewRepresentable {
     
@@ -73,7 +74,7 @@ open class ImagePreviewController: UIViewController {
     private let fullImageProvider: ImageProvider?
     public let scrollView = PreviewScrollView()
     
-    private var downloadTask: Task<Void, Error>?
+    private var tasks: [Task<Void, Error>] = []
     public var animation: ExpandAnimation?
     
     public init(image: UIImage? = nil, fullImageProvider: ImageProvider? = nil) {
@@ -87,7 +88,7 @@ open class ImagePreviewController: UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
     
-    public override func viewDidLoad() {
+    open override func viewDidLoad() {
         super.viewDidLoad()
         
         view.backgroundColor = UIColor.black
@@ -108,10 +109,25 @@ open class ImagePreviewController: UIViewController {
         }
         scrollView.didZoom?(scrollView.zoomScale)
         
+        if let fullImageProvider {
+            load(provider: fullImageProvider) { [weak self] image in
+                guard let wSelf = self else { return }
+            
+                if wSelf.image == nil {
+                    wSelf.scrollView.set(image: image)
+                } else {
+                    wSelf.scrollView.imageView.image = image
+                }
+            }
+        }
+    }
+    
+    public func load(provider: ImageProvider, completion: @MainActor @escaping (UIImage)->()) {
         let completion: (UIImage?)->() = { [weak self] image in
             guard let wSelf = self, let image = image else { return }
             
             Task { @MainActor in
+                completion(image)
                 if wSelf.image == nil {
                     wSelf.scrollView.set(image: image)
                 } else {
@@ -124,21 +140,27 @@ open class ImagePreviewController: UIViewController {
             }
         }
         
-        switch fullImageProvider {
+        switch provider {
         case .image(let image):
             scrollView.imageView.image = image
         case .url(let url):
-            downloadTask = Task {
-                let data = try await URLSession.shared.data(from: url).0
-                completion(UIImage(data: data))
-            }
+            tasks.append(Task {
+                if url.isFileURL {
+                    if let image = UIImage(contentsOfFile: url.path) {
+                        completion(image)
+                    } else {
+                        throw RunError.custom("No Image")
+                    }
+                } else {
+                    completion(UIImage(data: try await URLSession.shared.data(from: url).0))
+                }
+            })
         case .loader(let operation):
-            downloadTask = Task { completion(try? await operation()) }
-        case .none: break
+            tasks.append(Task { completion(try? await operation()) })
         }
     }
     
     deinit {
-        downloadTask?.cancel()
+        tasks.forEach { $0.cancel() }
     }
 }
