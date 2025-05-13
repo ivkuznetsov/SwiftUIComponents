@@ -4,9 +4,18 @@
 
 import UIKit
 import SwiftUI
-import CommonUtils
 
 public struct ExpandablePreviewImage: UIViewRepresentable {
+    
+    enum Error: LocalizedError {
+        case noImage
+        
+        var errorDescription: String? {
+            switch self {
+            case .noImage: "No Image"
+            }
+        }
+    }
     
     final class ExpandButton: UIButton {
         
@@ -149,7 +158,7 @@ open class ImagePreviewController: UIViewController {
                     if let image = UIImage(contentsOfFile: url.path) {
                         completion(image)
                     } else {
-                        throw RunError.custom("No Image")
+                        throw ExpandablePreviewImage.Error.noImage
                     }
                 } else {
                     completion(UIImage(data: try await URLSession.shared.data(from: url).0))
