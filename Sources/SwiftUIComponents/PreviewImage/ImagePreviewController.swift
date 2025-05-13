@@ -74,7 +74,7 @@ public struct ExpandablePreviewImage: UIViewRepresentable {
 public enum ImageProvider {
     case image(UIImage)
     case url(URL)
-    case loader(() async throws ->UIImage)
+    case loader(() async throws ->UIImage?)
 }
 
 open class ImagePreviewController: UIViewController {
@@ -120,7 +120,7 @@ open class ImagePreviewController: UIViewController {
         
         if let fullImageProvider {
             load(provider: fullImageProvider) { [weak self] image in
-                guard let wSelf = self else { return }
+                guard let wSelf = self, let image else { return }
             
                 if wSelf.image == nil {
                     wSelf.scrollView.set(image: image)
@@ -131,24 +131,7 @@ open class ImagePreviewController: UIViewController {
         }
     }
     
-    public func load(provider: ImageProvider, completion: @MainActor @escaping (UIImage)->()) {
-        let completion: (UIImage?)->() = { [weak self] image in
-            guard let wSelf = self, let image = image else { return }
-            
-            Task { @MainActor in
-                completion(image)
-                if wSelf.image == nil {
-                    wSelf.scrollView.set(image: image)
-                } else {
-                    wSelf.scrollView.imageView.image = image
-                    
-                }
-                let transition = CATransition()
-                transition.duration = 0.15
-                wSelf.scrollView.imageView.layer.add(transition, forKey: nil)
-            }
-        }
-        
+    public func load(provider: ImageProvider, completion: @MainActor @escaping (UIImage?)->()) {
         switch provider {
         case .image(let image):
             scrollView.imageView.image = image

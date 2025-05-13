@@ -63,6 +63,7 @@ public class ExpandAnimation: NSObject {
         
         pinchGR.delegate = self
         panGR.delegate = self
+        tapGR.cancelsTouchesInView = false
         tapGR.delegate = self
         tapGR.require(toFail: pinchGR)
         tapGR.require(toFail: panGR)
@@ -208,7 +209,7 @@ extension ExpandAnimation: UIViewControllerTransitioningDelegate {
     }
     
     public func interactionControllerForDismissal(using animator: UIViewControllerAnimatedTransitioning) -> UIViewControllerInteractiveTransitioning? {
-        return interactionDismissing ? self : nil
+        interactionDismissing ? self : nil
     }
 }
 
@@ -415,10 +416,14 @@ extension ExpandAnimation: UIViewControllerAnimatedTransitioning {
 extension ExpandAnimation: UIGestureRecognizerDelegate {
     
     public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if let view = gestureRecognizer.view,
+           view.hitTest(gestureRecognizer.location(in: view), with: nil) is UIControl {
+            return false
+        }
         return gestureRecognizer != pinchGR || pinchGR.scale < 1.0
     }
     
     public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        return gestureRecognizer != pinchGR && gestureRecognizer != panGR
+        gestureRecognizer != pinchGR && gestureRecognizer != panGR
     }
 }
