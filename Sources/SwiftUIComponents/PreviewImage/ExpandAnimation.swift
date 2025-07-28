@@ -161,6 +161,7 @@ public class ExpandAnimation: NSObject {
     func cancelInteraction() {
         if let context = interativeContext {
             let toVC = context.viewController(forKey: .to)
+            let fromVC = context.viewController(forKey: .from)
             let containerView = context.containerView
             
             context.cancelInteractiveTransition()
@@ -184,7 +185,14 @@ public class ExpandAnimation: NSObject {
                 self.source.isHidden = false
                 self.imageView.removeFromSuperview()
                 self.overlayView.removeFromSuperview()
-                toVC?.view.removeFromSuperview()
+                
+                if let toVC, let fromVC {
+                    if toVC.modalPresentationStyle == .fullScreen || toVC.presentingViewController == nil {
+                        toVC.view.removeFromSuperview()
+                    } else {
+                        fromVC.view.isHidden = false
+                    }
+                }
                 self.interativeContext?.completeTransition(false)
             })
         }
