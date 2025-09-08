@@ -8,6 +8,17 @@
 import Foundation
 import SwiftUI
 
+public struct OrientationKey: EnvironmentKey {
+    public static let defaultValue = OrientationAttributes.makeDefault()
+}
+
+public extension EnvironmentValues {
+    var orientation: OrientationAttributes {
+        get { self[OrientationKey.self] }
+        set { self[OrientationKey.self] = newValue }
+    }
+}
+
 public struct OrientationAttributes: Equatable {
     
     public enum Orientation {
@@ -16,6 +27,7 @@ public struct OrientationAttributes: Equatable {
     }
     public let orientation: Orientation
     public let isiPad: Bool
+    public var isPortrait: Bool { orientation == .portrait }
     
     static func makeDefault() -> OrientationAttributes {
         let screen = UIScreen.main
@@ -56,6 +68,7 @@ public struct OrientationContainer<V: View>: View {
     
     public var body: some View {
         return content(currentAttributes)
+            .environment(\.orientation, currentAttributes)
             .background {
                 GeometryReader { proxy in
                     Color.clear.preference(key: ViewSize.self, value: proxy.size)
