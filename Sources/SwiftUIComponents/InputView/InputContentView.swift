@@ -27,13 +27,13 @@ public final class FieldState: ObservableObject {
     
     @Published var validationResult = ValidationResult.valid
     @Published var shake = false
-    let focus: FocusState<UUID?>.Binding
     var validate: (()->ValidationResult)!
+    
+    private var inputObserver: AnyCancellable?
     
     init(id: UUID, inputState: InputState, validate: @escaping ()->ValidationResult) {
         self.id = id
         self.inputState = inputState
-        self.focus = inputState.focused
         self.validate = { [weak self] in
             guard let wSelf = self else { return .valid }
             
@@ -49,6 +49,14 @@ public final class FieldState: ObservableObject {
         }
         
         inputState.fields[id] = WeakWrapper(object: self)
+        
+        inputObserver = inputState.$focused.sink { [weak self] _ in
+            //if $0 == id {
+                DispatchQueue.main.async {
+                    self?.objectWillChange.send()
+                }
+            //}
+        }
     }
     
     func update(frame: CGRect) {
@@ -72,6 +80,8 @@ private struct InputFieldModifier<Value: Equatable, ErrorView: View>: ViewModifi
     
     @StateObject var state: FieldState
     @Binding var value: Value
+    @FocusState var focus: Bool
+    
     let errorView: (String)->ErrorView
     
     init(state: @autoclosure @escaping () -> FieldState, errorView: @escaping (String)->ErrorView, value: Binding<Value>) {
@@ -91,14 +101,40 @@ private struct InputFieldModifier<Value: Equatable, ErrorView: View>: ViewModifi
             if case .invalid(let string) = state.validationResult, string.count > 0 {
                 errorView(string)
             }
-        }.id(state.id)
-            .shaked(state.shake)
-            .focused(state.focus, equals: state.id)
-            .background {
-                GeometryReader { update(frame: $0.frame(in: .named(CoordinateSpace.inputView))) }
-            }.onChange(of: value) { _ in
-                state.resetValidation()
+        }
+        .id(state.id)
+        .shaked(state.shake)
+        .focused($focus)
+        .onChange(of: state.inputState?.focused) {
+            if $0 == state.id {
+                if !focus {
+                    focus = true
+                }
+            } else {
+                if focus && $0 == nil {
+                    focus = false
+                }
             }
+        }
+        .onChange(of: focus) {
+            if $0 {
+                if state.inputState?.focused != state.id {
+                    state.inputState?.focused = state.id
+                }
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if state.inputState?.focused == state.id {
+                        state.inputState?.focused = nil
+                    }
+                }
+            }
+        }
+        .background {
+            GeometryReader { update(frame: $0.frame(in: .named(CoordinateSpace.inputView))) }
+        }
+        .onChange(of: value) { _ in
+            state.resetValidation()
+        }
     }
 }
 
@@ -125,7 +161,7 @@ public extension View {
     func input(_ inputState: InputState,
                id: UUID = UUID(),
                errorView: @escaping (String)->AnyView = { InputErrorView(title: $0).asAny }) -> some View {
-        input<Bool>(inputState, id: id, errorView: errorView, value: .init(get: { true }, set: { _ in }), validation: { _ in true })
+        input(inputState, id: id, errorView: errorView, value: .init(get: { true }, set: { _ in }), validation: { _ in true })
     }
     
     func input<Value: Equatable>(_ inputState: InputState,
@@ -158,30 +194,19 @@ private extension CoordinateSpace {
     static let inputView = "inputView"
 }
 
-public struct InputContentView<Content: View>: View {
+private struct InputContentModifier: ViewModifier {
     
-    @StateObject private var state = InputState()
+    @ObservedObject var state: InputState
     @FocusState private var focus: UUID?
-    
-    private let content: (InputState)->Content
-    
-    public init(_ content: @escaping (_ inputState: InputState)->Content) {
-        self.content = content
-    }
-    
-    var contentView: some View {
-        state.focused = $focus
-        return content(state)
-    }
     
     private func updateCloseArea(_ proxy: GeometryProxy) -> some View {
         state.closeGesture.touchCloseArea = proxy.frame(in: .global)
         return Color.clear
     }
     
-    public var body: some View {
+    func body(content: Content) -> some View {
         ScrollViewReader { proxy in
-            contentView
+            content
                 .onReceive(state.scrollToItem.debounce(for: 0.5, scheduler: DispatchQueue.main)) { item in
                     withAnimation {
                         proxy.scrollTo(item)
@@ -191,8 +216,29 @@ public struct InputContentView<Content: View>: View {
                 }.onDisappear {
                     state.isVisisble = false
                 }
-        }.background(content: {
+        }
+        .onChange(of: focus) { newValue in
+            print(newValue?.uuidString ?? "none")
+        }
+        .background {
             GeometryReader { updateCloseArea($0) }
-        }).allowsHitTesting(!state.disableTouch)
+        }
+        .allowsHitTesting(!state.disableTouch)
+    }
+}
+
+public struct InputContentView<Content: View>: View {
+    
+    @State private var state = InputState()
+    
+    private let content: (InputState)->Content
+    
+    public init(_ content: @escaping (_ inputState: InputState)->Content) {
+        self.content = content
+    }
+    
+    public var body: some View {
+        content(state)
+            .modifier(InputContentModifier(state: state))
     }
 }

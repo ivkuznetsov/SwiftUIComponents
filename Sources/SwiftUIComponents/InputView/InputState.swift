@@ -10,22 +10,24 @@ import SwiftUI
 import Combine
 
 private extension UISpringTimingParameters {
+    
     var mass: Double? { value(forKey: "mass") as? Double }
     var stiffness: Double? { value(forKey: "stiffness") as? Double }
     var damping: Double? { value(forKey: "damping") as? Double }
 }
 
 public final class InputState: ObservableObject {
+    
     @Published public var keyboardInset: CGFloat = 0 {
         didSet { reloadGesture() }
     }
     
     @Published var disableTouch = false
     
-    var inputs: [UUID:CGRect] = [:]
-    var fields: [UUID:WeakWrapper<FieldState>] = [:]
+    var inputs: [UUID: CGRect] = [:]
+    var fields: [UUID: WeakWrapper<FieldState>] = [:]
     
-    var focused: FocusState<UUID?>.Binding!
+    @Published var focused: UUID?
     var isVisisble: Bool = false {
         didSet { reloadGesture() }
     }
@@ -64,7 +66,7 @@ public final class InputState: ObservableObject {
     
     private var observer: AnyCancellable?
     
-    init() {
+    public init() {
         closeGesture.closeKeyboard = { [weak self] in
             self?.closeKeyboard()
         }
@@ -83,7 +85,7 @@ public final class InputState: ObservableObject {
                             if inset != wSelf.keyboardInset {
                                 wSelf.keyboardInset = inset
                                 
-                                if let focused = wSelf.focused.wrappedValue {
+                                if let focused = wSelf.focused {
                                     wSelf.scrollToItem.send(focused)
                                 }
                             }
@@ -105,7 +107,7 @@ public final class InputState: ObservableObject {
     }
     
     public func select(_ id: UUID) {
-        focused.wrappedValue = id
+        focused = id
     }
     
     public func nextInput(_ currentId: UUID) -> UUID? {
@@ -131,23 +133,23 @@ public final class InputState: ObservableObject {
     }
     
     public func selectNext(_ id: UUID? = nil) -> Bool {
-        if let id = id ?? focused.wrappedValue, let next = nextInput(id) {
-            focused.wrappedValue = next
+        if let id = id ?? focused, let next = nextInput(id) {
+            focused = next
             return true
         }
         return false
     }
     
     public func selectPrevious(_ id: UUID? = nil) -> Bool {
-        if let id = id ?? focused.wrappedValue, let next = previousInput(id) {
-            focused.wrappedValue = next
+        if let id = id ?? focused, let next = previousInput(id) {
+            focused = next
             return true
         }
         return false
     }
     
     public func closeKeyboard() {
-        focused.wrappedValue = nil
+        focused = nil
         Self.closeKeyboard()
         disableTouch = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
