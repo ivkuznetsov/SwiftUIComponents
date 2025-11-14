@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 
 public struct OrientationKey: EnvironmentKey {
-    public static let defaultValue = OrientationAttributes.makeDefault()
+    public static let defaultValue = OrientationAttributes.makeDefault(injected: false)
 }
 
 public extension EnvironmentValues {
@@ -21,17 +21,29 @@ public extension EnvironmentValues {
 
 public struct OrientationAttributes: Equatable {
     
+    var injected: Bool = true
+    
     public enum Orientation {
         case portrait
         case landscape
     }
-    public let orientation: Orientation
-    public let isiPad: Bool
-    public var isPortrait: Bool { orientation == .portrait }
     
-    static func makeDefault() -> OrientationAttributes {
+    let internalOrientation: Orientation
+    public var orientation: Orientation {
+        if !injected { fatalError("The value has not been injected, check that root view wrapped in OrientationContainer { }") }
+        return internalOrientation
+    }
+    
+    public let isiPad: Bool
+    public var isPortrait: Bool {
+        if !injected { fatalError("The value has not been injected, check that root view wrapped in OrientationContainer { }") }
+        return orientation == .portrait
+    }
+    
+    static func makeDefault(injected: Bool = true) -> OrientationAttributes {
         let screen = UIScreen.main
-        return .init(orientation: screen.bounds.width > screen.bounds.height ? .landscape : .portrait,
+        return .init(injected: injected,
+                     internalOrientation: screen.bounds.width > screen.bounds.height ? .landscape : .portrait,
                      isiPad: screen.traitCollection.horizontalSizeClass == .regular &&
                              screen.traitCollection.verticalSizeClass == .regular)
     }
@@ -62,13 +74,12 @@ public struct OrientationContainer<V: View>: View {
     
     private func makeAttributes() -> OrientationAttributes {
         let bounds = UIScreen.main.bounds
-        return OrientationAttributes(orientation: bounds.width > bounds.height ? .landscape : .portrait,
+        return OrientationAttributes(internalOrientation: bounds.width > bounds.height ? .landscape : .portrait,
                                      isiPad: hSize == .regular && vSize == .regular)
     }
     
     public var body: some View {
         return content(currentAttributes)
-            .environment(\.orientation, currentAttributes)
             .background {
                 GeometryReader { proxy in
                     Color.clear.preference(key: ViewSize.self, value: proxy.size)
@@ -83,6 +94,7 @@ public struct OrientationContainer<V: View>: View {
                         }
                 }
             }
+            .environment(\.orientation, currentAttributes)
             .onChange(of: currentAttributes) {
                 didChange?($0)
             }
