@@ -83,11 +83,16 @@ private struct InputFieldModifier<Value: Equatable, ErrorView: View>: ViewModifi
     @FocusState var focus: Bool
     
     let errorView: (String)->ErrorView
+    let errorUnderline: Bool
     
-    init(state: @autoclosure @escaping () -> FieldState, errorView: @escaping (String)->ErrorView, value: Binding<Value>) {
+    init(state: @autoclosure @escaping () -> FieldState,
+         errorUnderline: Bool,
+         errorView: @escaping (String)->ErrorView,
+         value: Binding<Value>) {
         _state = .init(wrappedValue: state())
         _value = value
         self.errorView = errorView
+        self.errorUnderline = errorUnderline
     }
     
     private func update(frame: CGRect) -> some View {
@@ -100,6 +105,11 @@ private struct InputFieldModifier<Value: Equatable, ErrorView: View>: ViewModifi
             content
             if case .invalid(let string) = state.validationResult, string.count > 0 {
                 errorView(string)
+            }
+        }
+        .background {
+            if errorUnderline, case .invalid = state.validationResult {
+                RoundedRectangle(cornerRadius: 8, style: .continuous).foregroundStyle(Color.red.opacity(0.1)).padding(.horizontal, -5)
             }
         }
         .id(state.id)
@@ -166,20 +176,24 @@ public extension View {
     
     func input<Value: Equatable>(_ inputState: InputState,
                                  id: UUID = UUID(),
+                                 errorUnderline: Bool = false,
                                  errorView: @escaping (String)->AnyView = { InputErrorView(title: $0).asAny },
                                  value: Binding<Value>,
                                  validation: @escaping (Value)->ValidationResult = { _ in .valid }) -> some View {
         modifier(InputFieldModifier(state: .init(id: id, inputState: inputState, validate: { validation(value.wrappedValue) }),
+                                    errorUnderline: errorUnderline,
                                     errorView: errorView,
                                     value: value))
     }
     
     func input<Value: Equatable>(_ inputState: InputState,
                                  id: UUID = UUID(),
+                                 errorUnderline: Bool = false,
                                  errorView: @escaping (String)->AnyView = { InputErrorView(title: $0).asAny },
                                  value: Binding<Value>,
                                  validation: @escaping (Value)->Bool) -> some View {
         modifier(InputFieldModifier(state: .init(id: id, inputState: inputState, validate: { validation(value.wrappedValue) ? .valid : .invalid() }),
+                                    errorUnderline: errorUnderline,
                                     errorView: errorView,
                                     value: value))
     }
@@ -209,7 +223,7 @@ private struct InputContentModifier: ViewModifier {
             content
                 .onReceive(state.scrollToItem.debounce(for: 0.5, scheduler: DispatchQueue.main)) { item in
                     withAnimation {
-                        proxy.scrollTo(item)
+                        proxy.scrollTo(item.0, anchor: item.1)
                     }
                 }.onAppear {
                     state.isVisisble = true

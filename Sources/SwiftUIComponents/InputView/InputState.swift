@@ -44,7 +44,7 @@ public final class InputState: ObservableObject {
     
     public var keyboardPresented: Bool { keyboardInset > 0 }
     
-    public let scrollToItem = PassthroughSubject<UUID, Never>()
+    public let scrollToItem = PassthroughSubject<(UUID, UnitPoint?), Never>()
     let closeGesture = CloseKeyboardGestureRecognizer()
     
     private func animation(from notification: Notification) -> Animation? {
@@ -86,7 +86,7 @@ public final class InputState: ObservableObject {
                                 wSelf.keyboardInset = inset
                                 
                                 if let focused = wSelf.focused {
-                                    wSelf.scrollToItem.send(focused)
+                                    wSelf.scrollToItem.send((focused, nil))
                                 }
                             }
                         } else {
@@ -163,12 +163,28 @@ public final class InputState: ObservableObject {
     
     public func validate() -> Bool {
         var result = true
+        
+        var firstField: UUID?
+        
         fields.values.forEach {
             if $0()?.validate() != .valid {
+                if firstField == nil {
+                    firstField = $0.object?.id
+                }
                 result = false
             }
         }
+        if !result, let firstField {
+            scrollToItem.send((firstField, .center))
+        }
+        
         return result
+    }
+    
+    public func resetValidation() {
+        fields.values.forEach {
+            $0.object?.resetValidation()
+        }
     }
 }
 
