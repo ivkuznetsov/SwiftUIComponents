@@ -24,6 +24,13 @@ public struct PreviewImage: UIViewRepresentable {
 
 public final class PreviewScrollView: UIScrollView, UIScrollViewDelegate {
     
+    final class ContainerView: UIView {
+        
+        override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+            (superview as? UIScrollView)?.bounds.contains(point) ?? super.point(inside: point, with: event)
+        }
+    }
+    
     public var aspectFill: Bool = false
     public let imageView: UIImageView = {
         let imageView = UIImageView()
@@ -35,7 +42,7 @@ public final class PreviewScrollView: UIScrollView, UIScrollViewDelegate {
     }()
     
     let containerView: UIView = {
-        let view = UIView()
+        let view = ContainerView()
         view.backgroundColor = .clear
         return view
     }()
