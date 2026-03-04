@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 
 public struct OrientationKey: EnvironmentKey {
-    public static let defaultValue = OrientationAttributes.makeDefault(injected: false)
+    public static let defaultValue = OrientationAttributes(injected: false)
 }
 
 public extension EnvironmentValues {
@@ -34,18 +34,46 @@ public struct OrientationAttributes: Equatable {
         return internalOrientation
     }
     
+    let internalAppOrientation: Orientation
+    public var appOrientation: Orientation {
+        if !injected { fatalError("The value has not been injected, check that root view wrapped in OrientationContainer { }") }
+        return internalAppOrientation
+    }
+    
+    
     public let isiPad: Bool
     public var isPortrait: Bool {
         if !injected { fatalError("The value has not been injected, check that root view wrapped in OrientationContainer { }") }
         return orientation == .portrait
     }
     
-    static func makeDefault(injected: Bool = true) -> OrientationAttributes {
+    init(hSize: UserInterfaceSizeClass? = nil, vSize: UserInterfaceSizeClass? = nil, injected: Bool = true) {
         let screen = UIScreen.main
-        return .init(injected: injected,
-                     internalOrientation: screen.bounds.width > screen.bounds.height ? .landscape : .portrait,
-                     isiPad: screen.traitCollection.horizontalSizeClass == .regular &&
-                             screen.traitCollection.verticalSizeClass == .regular)
+        internalAppOrientation = screen.bounds.width > screen.bounds.height ? .landscape : .portrait
+        
+        let hSize = hSize ?? .init(screen.traitCollection.horizontalSizeClass)
+        let vSize = vSize ?? .init(screen.traitCollection.verticalSizeClass)
+        
+        if hSize == .compact && vSize == .regular {
+            internalOrientation = .portrait
+        } else if hSize == .regular && vSize == .compact {
+            internalOrientation = .landscape
+        } else {
+            internalOrientation = internalAppOrientation
+        }
+        self.injected = injected
+        self.isiPad = screen.traitCollection.horizontalSizeClass == .regular && screen.traitCollection.verticalSizeClass == .regular
+    }
+}
+
+extension UserInterfaceSizeClass {
+    
+    init(_ uiSizeClass: UIUserInterfaceSizeClass) {
+        switch uiSizeClass {
+        case .compact: self = .compact
+        case .regular: self = .regular
+        default: self = .compact
+        }
     }
 }
 
@@ -67,15 +95,9 @@ public struct OrientationContainer<V: View>: View {
 
     public init(@ViewBuilder content: @escaping (OrientationAttributes)->V,
                 didChange: ((OrientationAttributes)->())? = nil) {
-        _currentAttributes = .init(initialValue: .makeDefault())
+        _currentAttributes = .init(initialValue: .init())
         self.content = content
         self.didChange = didChange
-    }
-    
-    private func makeAttributes() -> OrientationAttributes {
-        let bounds = UIScreen.main.bounds
-        return OrientationAttributes(internalOrientation: bounds.width > bounds.height ? .landscape : .portrait,
-                                     isiPad: hSize == .regular && vSize == .regular)
     }
     
     public var body: some View {
@@ -85,7 +107,7 @@ public struct OrientationContainer<V: View>: View {
                     Color.clear.preference(key: ViewSize.self, value: proxy.size)
                         .onPreferenceChange(ViewSize.self) { attr in
                             Task { @MainActor in
-                                let attr = makeAttributes()
+                                let attr = OrientationAttributes(hSize: hSize, vSize: vSize)
                                 
                                 if currentAttributes != attr {
                                     currentAttributes = attr

@@ -41,17 +41,22 @@ public struct CloseButton: View {
             Image(systemName: icon)
         })
         .accessibilityLabel(title)
+        .font(.system(size: 15, weight: .medium, design: .rounded))
+        .foregroundColor(iconColor ?? contentStyle.labelColor)
+        .frame(width: 33, height: 33)
     }
     
     public var body: some View {
-        button
-            .font(.system(size: 15, weight: .medium, design: .rounded))
-            .foregroundColor(iconColor ?? contentStyle.labelColor)
-            .frame(width: 33, height: 33)
-            .background(background ?? contentStyle.controlColor)
-            .buttonStyle(PlainButtonStyle())
-            .clipShape(Circle())
-            .padding(.horizontal, 3)
+        if #available(iOS 26, *) {
+            button
+                .background(background ?? nil)
+        } else {
+            button
+                .background(background ?? contentStyle.controlColor)
+                .buttonStyle(PlainButtonStyle())
+                .clipShape(Circle())
+                .padding(.horizontal, 3)
+        }
     }
 }
 
