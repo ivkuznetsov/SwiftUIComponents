@@ -7,6 +7,11 @@ import SwiftUI
 
 public struct CloseButton: View {
     
+    public enum Position {
+        case left
+        case right
+    }
+    
     @EnvironmentObject private var contentStyle: ContentStyle
     @Environment(\.dismiss) private var dismiss
     
@@ -62,9 +67,9 @@ public struct CloseButton: View {
 
 public extension View {
     
-    func withCloseButton(action: (()->())? = nil, hidden: Bool = false) -> some View {
+    func withCloseButton(action: (()->())? = nil, position: CloseButton.Position = .right, hidden: Bool = false) -> some View {
         toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: position == .right ? .topBarTrailing : .topBarLeading) {
                 if !hidden {
                     CloseButton(action: action)
                 }
