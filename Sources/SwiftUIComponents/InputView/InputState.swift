@@ -18,6 +18,8 @@ private extension UISpringTimingParameters {
 
 public final class InputState: ObservableObject {
     
+    public let updateValues = PassthroughSubject<Void, Never>()
+    
     @Published public var keyboardInset: CGFloat = 0 {
         didSet { reloadGesture() }
     }
@@ -151,6 +153,7 @@ public final class InputState: ObservableObject {
     public func closeKeyboard() {
         focused = nil
         Self.closeKeyboard()
+        updateValues.send()
         disableTouch = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
             self?.disableTouch = false
@@ -162,6 +165,8 @@ public final class InputState: ObservableObject {
     }
     
     public func validate() -> Bool {
+        updateValues.send()
+        
         var result = true
         
         var firstField: UUID?
